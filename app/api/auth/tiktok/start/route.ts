@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const cfg = tiktokConfig();
   if (!cfg) {
+    // Names only, never values: helps spot a missing/misnamed variable in the runtime logs.
+    const missing = ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "APP_URL"].filter((k) => !process.env[k]);
+    console.warn("TikTok login not configured; missing env:", missing.join(", ") || "(none, check TIKTOK_REDIRECT_URI)");
     if (devLoginEnabled()) return NextResponse.redirect(new URL("/login?dev=1", req.url));
     return NextResponse.redirect(new URL("/login?error=not_configured", req.url));
   }
