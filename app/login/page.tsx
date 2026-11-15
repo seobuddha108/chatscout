@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { currentCreator } from "@/auth/current";
 import { devLoginEnabled } from "@/auth/dev";
 
+export const dynamic = "force-dynamic";
+
 const ERRORS: Record<string, string> = {
   denied: "Du hast die Anmeldung bei TikTok abgebrochen.",
   invalid_state: "Die Anmeldung ist abgelaufen oder ungültig. Bitte versuche es erneut.",
