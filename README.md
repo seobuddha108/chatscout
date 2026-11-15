@@ -108,12 +108,20 @@ They were written without access to TikTok's docs, so check them against the cur
 
 Plans are defined in `src/api/plans.ts` (basic/pro/business: requests per day and maximum `limit`).
 
-## Connecting real data
+## Real LIVE data (TikTok)
 
-Implement `LiveSource` in `src/ingest/`, then register it in `sourceFromEnv()`.
-WebSocket connectors are push-based and need a long-running worker that buffers
-events and calls `ingestEvents()`. They do not fit serverless cron. Check the
-platform's terms of service before scraping.
+`/api/cron/live` runs every minute (Vercel Pro, `maxDuration` 300 s) when `LIVE_SOURCE` includes `tiktok`:
+
+- It leases every **verified creator with an active key** (`live_watch` table), connects to those who are
+  live via the unofficial `tiktok-live-connector` (signing by Euler Stream, free tier unless `EULER_API_KEY`
+  is set) and streams chat, gifts, viewer counts, polls and stream end into the database every 3 s.
+- Each tick watches for about 4.5 minutes. The next tick takes a creator over about 75 s before that ends. Overlapping
+  deliveries are de-duplicated by TikTok message id (`chat_messages` / `gift_events.external_msg_id`).
+- Offline creators are re-checked every 2 minutes.
+- `src/live/tiktok.ts` maps the events and `src/live/runner.ts` handles leasing. Both are tested with a fake connection.
+
+The connector is reverse-engineered and not production-ready by its authors' own account. Reading streams may
+conflict with TikTok's terms.
 
 ## Deploying to Vercel
 

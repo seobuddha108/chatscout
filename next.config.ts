@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // PGlite ships WASM + data files; keep it out of the server bundle.
-  serverExternalPackages: ["@electric-sql/pglite"],
+  serverExternalPackages: ["@electric-sql/pglite", "tiktok-live-connector"],
 };
 
 export default nextConfig;

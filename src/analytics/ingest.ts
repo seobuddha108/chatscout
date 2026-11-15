@@ -33,6 +33,7 @@ export async function ingestAnalytics(
   const pollStarts: Extract<LiveEvent, { type: "poll_start" }>[] = [];
   const votes: Extract<LiveEvent, { type: "poll_vote" }>[] = [];
   const pollEnds = new Map<string, Date>();
+  const tallies: Extract<LiveEvent, { type: "poll_tally" }>[] = [];
 
   for (const e of events) {
     const room = rooms.get(e.roomId);
@@ -50,6 +51,7 @@ export async function ingestAnalytics(
     } else if (e.type === "poll_start") pollStarts.push(e);
     else if (e.type === "poll_vote") votes.push(e);
     else if (e.type === "poll_end") pollEnds.set(e.pollId, e.at);
+    else if (e.type === "poll_tally") { tallies.push(e); if (e.ended) pollEnds.set(e.pollId, e.at); }
   }
 
   for (const batch of chunks([...minutes.values()])) {
@@ -90,15 +92,20 @@ export async function ingestAnalytics(
 
   // --- polls ------------------------------------------------------------------------
   let pollsCreated = 0;
-  const newPolls = dedupe(pollStarts, (p) => p.pollId).flatMap((p) => {
-    const room = rooms.get(p.roomId)!;
+  const newPolls = dedupe([
+    ...pollStarts.map((p) => ({ ...p })),
+    // A tally can arrive without a start event (e.g. watcher joined mid-poll).
+    ...tallies.map((t) => ({ roomId: t.roomId, pollId: t.pollId, question: t.question ?? "Poll", options: t.options.map(({ id, text }) => ({ id, text })), at: t.at })),
+  ], (p) => p.pollId).flatMap((p) => {
+    const room = rooms.get(p.roomId);
+    if (!room) return [];
     return [{ externalPollId: p.pollId, sessionId: room.id, creatorId: room.creatorId, question: p.question, options: p.options, startedAt: p.at }];
   });
   for (const batch of chunks(newPolls)) {
     pollsCreated += (await db.insert(polls).values(batch).onConflictDoNothing({ target: polls.externalPollId }).returning({ id: polls.id })).length;
   }
 
-  const pollIds = [...new Set([...votes.map((v) => v.pollId), ...pollEnds.keys()])];
+  const pollIds = [...new Set([...votes.map((v) => v.pollId), ...pollEnds.keys(), ...tallies.map((t) => t.pollId)])];
   const pollMap = new Map<string, { id: number; creatorId: number; options: Set<string> }>();
   for (const batch of chunks(pollIds)) {
     const rows = await db.select({ id: polls.id, ext: polls.externalPollId, creatorId: polls.creatorId, options: polls.options })
@@ -123,6 +130,42 @@ export async function ingestAnalytics(
       named.push({ pollId: p.id, voterUniqueId: v.user.uniqueId.toLowerCase(), voterNickname: v.user.nickname, optionId: v.optionId, votedAt: v.at });
     }
   }
+  // Tallies: turn absolute totals into per-minute increments against what is already stored.
+  if (tallies.length) {
+    const tallyPolls = [...new Set(tallies.map((t) => pollMap.get(t.pollId)?.id).filter((x): x is number => x !== undefined))];
+    const stored = new Map<string, number>(); // "pollId|optionId" -> votes already counted
+    if (tallyPolls.length) {
+      const rows = await db.select({ pollId: pollVoteBuckets.pollId, optionId: pollVoteBuckets.optionId, votes: sql<string>`sum(${pollVoteBuckets.votes})` })
+        .from(pollVoteBuckets).where(inArray(pollVoteBuckets.pollId, tallyPolls))
+        .groupBy(pollVoteBuckets.pollId, pollVoteBuckets.optionId);
+      for (const r of rows) stored.set(`${r.pollId}|${r.optionId}`, Number(r.votes));
+    }
+    for (const b of buckets.values()) stored.set(`${b.pollId}|${b.optionId}`, (stored.get(`${b.pollId}|${b.optionId}`) ?? 0) + b.votes);
+    for (const t of [...tallies].sort((a, b) => a.at.getTime() - b.at.getTime())) {
+      const p = pollMap.get(t.pollId);
+      if (!p) continue;
+      const minute = minuteOf(t.at);
+      for (const o of t.options) {
+        if (!p.options.has(o.id)) continue;
+        const k = `${p.id}|${o.id}`;
+        const delta = o.votes - (stored.get(k) ?? 0);
+        if (delta <= 0) continue;
+        stored.set(k, o.votes);
+        pollVotes += delta;
+        const bk = `${p.id}|${o.id}|${minute.getTime()}`;
+        const b = buckets.get(bk) ?? { pollId: p.id, optionId: o.id, minute, votes: 0 };
+        b.votes += delta;
+        buckets.set(bk, b);
+      }
+      if (t.voters?.length && (await optedIn()).has(p.creatorId)) {
+        for (const v of t.voters) {
+          if (!p.options.has(v.optionId)) continue;
+          named.push({ pollId: p.id, voterUniqueId: v.userId, voterNickname: v.nickname, optionId: v.optionId, votedAt: t.at });
+        }
+      }
+    }
+  }
+
   for (const batch of chunks([...buckets.values()])) {
     await db.insert(pollVoteBuckets).values(batch).onConflictDoUpdate({
       target: [pollVoteBuckets.pollId, pollVoteBuckets.optionId, pollVoteBuckets.minute],

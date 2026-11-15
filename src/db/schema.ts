@@ -50,7 +50,9 @@ export const giftEvents = pgTable("gift_events", {
   giftName: text("gift_name").notNull(),
   diamonds: integer("diamonds").notNull(), // unit price * repeat count
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  externalMsgId: text("external_msg_id"), // TikTok message id, for de-duplication
 }, (t) => [
+  uniqueIndex("gift_events_msg_idx").on(t.sessionId, t.externalMsgId),
   index("gift_events_created_idx").on(t.createdAt),
   index("gift_events_creator_idx").on(t.creatorId, t.createdAt),
   index("gift_events_gifter_idx").on(t.gifterId, t.createdAt),
@@ -85,9 +87,11 @@ export const chatMessages = pgTable("chat_messages", {
   chatterNickname: text("chatter_nickname").notNull(),
   text: text("text").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  externalMsgId: text("external_msg_id"), // TikTok message id, for de-duplication
   // "simple" config: no stemming, works for any language and for usernames/emotes.
   tsv: tsvector("tsv").generatedAlwaysAs(sql`to_tsvector('simple', text)`),
 }, (t) => [
+  uniqueIndex("chat_msg_idx").on(t.sessionId, t.externalMsgId),
   index("chat_creator_time_idx").on(t.creatorId, t.createdAt),
   index("chat_creator_chatter_idx").on(t.creatorId, t.chatterUniqueId, t.createdAt),
   index("chat_tsv_idx").using("gin", t.tsv),
@@ -160,3 +164,16 @@ export const sessionMentions = pgTable("session_mentions", {
   primaryKey({ columns: [t.sessionId, t.mentionedCreatorId] }),
   index("session_mentions_mentioned_idx").on(t.mentionedCreatorId),
 ]);
+
+/**
+ * Which cron invocation currently watches a creator's LIVE (lease), plus check bookkeeping.
+ * Overlapping leases are fine: messages are de-duplicated by TikTok message id.
+ */
+export const liveWatch = pgTable("live_watch", {
+  creatorId: integer("creator_id").primaryKey().references(() => creators.id),
+  leaseOwner: text("lease_owner"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  lastLiveAt: timestamp("last_live_at", { withTimezone: true }),
+  lastError: text("last_error"),
+});

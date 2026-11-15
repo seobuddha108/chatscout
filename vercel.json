@@ -1,5 +1,8 @@
 {
   "buildCommand": "npm run vercel-build",
   "regions": ["lhr1"],
-  "crons": [{ "path": "/api/cron/ingest", "schedule": "*/5 * * * *" }]
+  "crons": [
+    { "path": "/api/cron/ingest", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/live", "schedule": "* * * * *" }
+  ]
 }

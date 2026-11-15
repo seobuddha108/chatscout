@@ -13,6 +13,7 @@ export interface IngestResult extends AnalyticsResult {
   gifts: number;
   chats: number;
   chatsDropped: number; // chat from creators without an active ChatScout key (not stored)
+  duplicates: number; // chat/gift events already stored (same TikTok message id)
   skipped: number; // events for rooms we have never seen a live_start for
 }
 
@@ -21,8 +22,8 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   const starts = new Map<string, Extract<LiveEvent, { type: "live_start" }>>();
   const ends = new Map<string, Date>();
   const peak = new Map<string, number>();
-  const gifts: Extract<LiveEvent, { type: "gift" }>[] = [];
-  const chats: Extract<LiveEvent, { type: "chat" }>[] = [];
+  let gifts: Extract<LiveEvent, { type: "gift" }>[] = [];
+  let chats: Extract<LiveEvent, { type: "chat" }>[] = [];
   const creatorInfo = new Map<string, CreatorInfo>();
   const gifterInfo = new Map<string, GifterInfo>();
 
@@ -78,6 +79,21 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     for (const r of rows) rooms.set(r.room, r);
   }
 
+  // 3b. Drop chat/gift events already stored (overlapping watchers, retries), keyed by TikTok message id.
+  const dupes = await knownMessageIds(db, rooms, chats, gifts);
+  const seen = new Set<string>();
+  const isFresh = (e: { type: string; roomId: string; msgId?: string }) => {
+    if (!e.msgId) return true;
+    const key = `${e.type}|${e.roomId}|${e.msgId}`;
+    if (dupes.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+  const freshEvents = events.filter((e) => (e.type === "chat" || e.type === "gift") ? isFresh(e) : true);
+  const duplicates = events.length - freshEvents.length;
+  chats = freshEvents.filter((e): e is typeof chats[number] => e.type === "chat");
+  gifts = freshEvents.filter((e): e is typeof gifts[number] => e.type === "gift");
+
   // 4. Gifts.
   let skipped = 0;
   const giftRows = [];
@@ -86,10 +102,10 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     if (!room) { skipped++; continue; }
     giftRows.push({
       sessionId: room.id, creatorId: room.creatorId, gifterId: gifterIds.get(g.gifter.uniqueId)!,
-      giftName: g.giftName, diamonds: g.diamonds, createdAt: g.at,
+      giftName: g.giftName, diamonds: g.diamonds, createdAt: g.at, externalMsgId: g.msgId ?? null,
     });
   }
-  for (const batch of chunks(giftRows)) await db.insert(giftEvents).values(batch);
+  for (const batch of chunks(giftRows)) await db.insert(giftEvents).values(batch).onConflictDoNothing();
 
   // 4b. Chat — only for creators who opted in. Everyone else's chat is never written.
   let chatsDropped = 0;
@@ -104,14 +120,14 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
       if (!optedIn.has(room.creatorId)) { chatsDropped++; continue; }
       chatRows.push({
         sessionId: room.id, creatorId: room.creatorId, chatterUniqueId: c.user.uniqueId.toLowerCase(),
-        chatterNickname: c.user.nickname, text: c.text.slice(0, 500), createdAt: c.at,
+        chatterNickname: c.user.nickname, text: c.text.slice(0, 500), createdAt: c.at, externalMsgId: c.msgId ?? null,
       });
     }
-    for (const batch of chunks(chatRows)) await db.insert(chatMessages).values(batch);
+    for (const batch of chunks(chatRows)) await db.insert(chatMessages).values(batch).onConflictDoNothing();
   }
 
   // 4c. Aggregate analytics (chat volume/sentiment, mentions, polls).
-  const analytics = await ingestAnalytics(db, events, rooms, getOptedIn);
+  const analytics = await ingestAnalytics(db, freshEvents, rooms, getOptedIn);
 
   // 5. Peak viewers and session ends, one UPDATE ... FROM (VALUES ...) per chunk.
   const peakRows = [...peak].filter(([room]) => rooms.has(room));
@@ -132,7 +148,30 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     sessionsEnded += rowCount(res);
   }
 
-  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, skipped, ...analytics };
+  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, duplicates, skipped, ...analytics };
+}
+
+/** "type|roomId|msgId" keys of chat/gift events in this batch that are already in the database. */
+async function knownMessageIds(
+  db: DB, rooms: Map<string, { id: number; creatorId: number }>,
+  chats: { roomId: string; msgId?: string }[], gifts: { roomId: string; msgId?: string }[],
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const roomById = new Map([...rooms].map(([room, r]) => [r.id, room]));
+  const lookups = [
+    { type: "chat", table: chatMessages, items: chats },
+    { type: "gift", table: giftEvents, items: gifts },
+  ] as const;
+  for (const { type, table, items } of lookups) {
+    const ids = [...new Set(items.filter((e) => e.msgId && rooms.has(e.roomId)).map((e) => e.msgId!))];
+    const sessionIds = [...new Set(items.filter((e) => e.msgId && rooms.has(e.roomId)).map((e) => rooms.get(e.roomId)!.id))];
+    for (const batch of chunks(ids)) {
+      const rows = await db.select({ sessionId: table.sessionId, msgId: table.externalMsgId }).from(table)
+        .where(and(inArray(table.sessionId, sessionIds), inArray(table.externalMsgId, batch)));
+      for (const r of rows) out.add(`${type}|${roomById.get(r.sessionId)}|${r.msgId}`);
+    }
+  }
+  return out;
 }
 
 /** Creators verified via TikTok Login that also hold an active (not revoked, not expired) key. */
@@ -188,12 +227,41 @@ export async function closeStaleSessions(db: DB, maxHours = 12, now = new Date()
   return rows.length;
 }
 
-export function sourceFromEnv(): LiveSource {
-  const name = process.env.LIVE_SOURCE ?? "mock";
-  switch (name) {
-    case "mock": return new MockSource();
-    default: throw new Error(`Unknown LIVE_SOURCE "${name}"`);
-  }
+/** LIVE_SOURCE: "mock" (fake data via the ingest cron), "tiktok" (real data via /api/cron/live), or "none". */
+export const liveSources = () => new Set((process.env.LIVE_SOURCE ?? "mock").split(",").map((s) => s.trim()).filter(Boolean));
+
+/** The pull-based source for /api/cron/ingest, or null if mock data is switched off. */
+export function sourceFromEnv(): LiveSource | null {
+  return liveSources().has("mock") ? new MockSource() : null;
+}
+
+/** Removes everything generated by MockSource (rooms named "mock-…"), e.g. after switching to real data. */
+export async function purgeMockData(db: DB): Promise<number> {
+  const rows = allRowsOf<{ id: number }>(await db.execute(sql`select id from live_sessions where external_room_id like 'mock-%' limit 5000`));
+  if (!rows.length) return 0;
+  const ids = sql.join(rows.map((r) => sql`${r.id}`), sql`, `);
+  await db.execute(sql`delete from poll_voters where poll_id in (select id from polls where session_id in (${ids}))`);
+  await db.execute(sql`delete from poll_vote_buckets where poll_id in (select id from polls where session_id in (${ids}))`);
+  await db.execute(sql`delete from polls where session_id in (${ids})`);
+  await db.execute(sql`delete from session_mentions where session_id in (${ids})`);
+  await db.execute(sql`delete from session_minute_stats where session_id in (${ids})`);
+  await db.execute(sql`delete from chat_messages where session_id in (${ids})`);
+  await db.execute(sql`delete from gift_events where session_id in (${ids})`);
+  await db.execute(sql`delete from live_sessions where id in (${ids})`);
+  // Orphans: mock gifters, and mock creators that never verified or got a key.
+  await db.execute(sql`delete from gifters g where not exists (select 1 from gift_events e where e.gifter_id = g.id)`);
+  await db.execute(sql`delete from session_mentions m where exists (select 1 from creators c where c.id = m.mentioned_creator_id
+    and c.verified_at is null and not exists (select 1 from live_sessions s where s.creator_id = c.id)
+    and not exists (select 1 from api_keys k where k.creator_id = c.id))`);
+  await db.execute(sql`delete from creators c where c.verified_at is null
+    and not exists (select 1 from live_sessions s where s.creator_id = c.id)
+    and not exists (select 1 from api_keys k where k.creator_id = c.id)
+    and not exists (select 1 from session_mentions m where m.mentioned_creator_id = c.id)`);
+  return rows.length;
+}
+
+function allRowsOf<T>(res: unknown): T[] {
+  return (Array.isArray(res) ? res : (res as { rows: T[] }).rows) as T[];
 }
 
 function* chunks<T>(arr: T[], size = CHUNK): Generator<T[]> {
