@@ -5,6 +5,9 @@ import { allRows } from "@/db/rows";
 import { ingestEvents } from "@/ingest/ingest";
 import type { Category } from "@/ingest/types";
 import { watchLive, type ConnectionFactory, type WatchResult } from "./tiktok";
+import { findHlsUrl } from "@/video/stream-url";
+import { recordHls } from "@/video/recorder";
+import { storeFromEnv, type ObjectStore } from "@/video/storage";
 
 export interface RunOptions {
   /** How long this invocation may watch (keep below the function's maxDuration). */
@@ -16,6 +19,9 @@ export interface RunOptions {
   maxCreators?: number;
   factory?: ConnectionFactory;
   now?: Date;
+  /** Object store for video; defaults to Supabase Storage from env (video is skipped if unset). */
+  store?: ObjectStore | null;
+  fetchImpl?: typeof fetch;
 }
 
 /**
@@ -35,7 +41,7 @@ export async function runLiveWindow(db: DB, o: RunOptions = {}) {
   const recheckAfter = new Date(now.getTime() - checkEveryMs);
 
   // Lease candidates atomically (concurrent invocations can't grab the same creator).
-  const leased = allRows<{ id: number; unique_id: string; nickname: string; country: string | null; category: string }>(await db.execute(sql`
+  const leased = allRows<{ id: number; unique_id: string; nickname: string; country: string | null; category: string; can_record: boolean }>(await db.execute(sql`
     with candidates as (
       select c.id from creators c
       left join live_watch w on w.creator_id = c.id
@@ -62,7 +68,12 @@ export async function runLiveWindow(db: DB, o: RunOptions = {}) {
         or live_watch.lease_owner = excluded.lease_owner
       returning creator_id
     )
-    select c.id, c.unique_id, c.nickname, c.country, c.category from creators c join upserted u on u.creator_id = c.id`));
+    select c.id, c.unique_id, c.nickname, c.country, c.category,
+      -- video only for the creator's own streams, when they switched it on
+      (c.record_video and c.verified_at is not null and exists (select 1 from api_keys k where k.creator_id = c.id
+        and k.revoked_at is null and k.expires_at > ${now.toISOString()}::timestamptz)) as can_record
+    from creators c join upserted u on u.creator_id = c.id`));
+  const store = o.store === undefined ? storeFromEnv() : o.store;
 
   const results = await Promise.all(leased.map(async (c): Promise<{ creator: string } & WatchResult> => {
     const res = await watchLive({
@@ -70,7 +81,19 @@ export async function runLiveWindow(db: DB, o: RunOptions = {}) {
       deadline: leaseUntil,
       factory: o.factory,
       flush: (events) => ingestEvents(db, events),
-      onLive: () => db.execute(sql`update live_watch set last_live_at = now(), last_error = null where creator_id = ${c.id}`),
+      onLive: async (roomId, roomInfo) => {
+        await db.execute(sql`update live_watch set last_live_at = now(), last_error = null where creator_id = ${c.id}`);
+        if (!c.can_record || !store) return;
+        const hls = findHlsUrl(roomInfo);
+        if (!hls) { console.warn(`no HLS url for @${c.unique_id}`); return; }
+        const ctrl = new AbortController();
+        const recording = (async () => {
+          const sessionId = await waitForSession(db, roomId, ctrl.signal);
+          if (!sessionId) return null;
+          return recordHls({ db, sessionId, playlistUrl: hls, store, deadline: leaseUntil, signal: ctrl.signal, fetchImpl: o.fetchImpl });
+        })();
+        return async () => { ctrl.abort(); return recording; };
+      },
     });
     if (res.status !== "deadline") {
       // Offline, ended, dropped or failed: release so the next tick re-checks (offline ones after checkEveryMs).
@@ -82,4 +105,15 @@ export async function runLiveWindow(db: DB, o: RunOptions = {}) {
   }));
 
   return { owner, watched: results.length, results };
+}
+
+/** The session row is written by the first event flush; wait briefly for it. */
+async function waitForSession(db: DB, roomId: string, signal: AbortSignal, timeoutMs = 20_000): Promise<number | null> {
+  const until = Date.now() + timeoutMs;
+  while (!signal.aborted && Date.now() < until) {
+    const [row] = allRows<{ id: number }>(await db.execute(sql`select id from live_sessions where external_room_id = ${roomId}`));
+    if (row) return row.id;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
 }

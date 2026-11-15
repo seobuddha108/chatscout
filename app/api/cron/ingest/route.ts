@@ -1,5 +1,7 @@
 import { getDb } from "@/db";
 import { errorJson, hasBearer, json } from "@/api/handler";
+import { purgeOldVideo } from "@/video/playback";
+import { storeFromEnv } from "@/video/storage";
 import { closeStaleSessions, purgeExpiredSessions, purgeMockData, purgeOldChat, purgeOldGifts, runIngest, sourceFromEnv } from "@/ingest/ingest";
 
 export const dynamic = "force-dynamic";
@@ -16,5 +18,6 @@ export async function GET(req: Request) {
   const chatPurged = await purgeOldChat(db);
   const sessionsPurged = await purgeExpiredSessions(db);
   const giftsPurged = await purgeOldGifts(db);
-  return json({ ok: true, ...result, staleClosed, chatPurged, sessionsPurged, giftsPurged });
+  const videoSegmentsPurged = await purgeOldVideo(db, storeFromEnv());
+  return json({ ok: true, ...result, staleClosed, chatPurged, sessionsPurged, giftsPurged, videoSegmentsPurged });
 }

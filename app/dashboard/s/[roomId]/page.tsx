@@ -1,6 +1,10 @@
 import { requireSessionAccess } from "@/auth/viewer";
 import { pollDetail, sessionTimeline } from "@/analytics/queries";
 import { searchChat } from "@/chat/queries";
+import { eq } from "drizzle-orm";
+import { liveSessions } from "@/db/schema";
+import { seekIndex, sessionSegments } from "@/video/playback";
+import { Player, SeekTime } from "./player";
 
 export const dynamic = "force-dynamic";
 const time = (d: Date) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
@@ -16,6 +20,13 @@ export default async function SessionPage({ params, searchParams }: {
   const t = (await sessionTimeline(db, roomId))!;
   const chat = await searchChat(db, { creatorId, session: roomId, q: q || undefined, limit: 200, offset: 0 });
   const polls = await Promise.all(t.polls.map((p) => pollDetail(db, p.pollId, viewer.id)));
+  // Video: only the creator's own recordings.
+  const own = viewer.id === creatorId;
+  const [sess] = await db.select({ id: liveSessions.id }).from(liveSessions).where(eq(liveSessions.externalRoomId, roomId));
+  const segs = own ? await sessionSegments(db, sess.id) : [];
+  const index = seekIndex(segs);
+  const hasVideo = index.length > 0;
+  const at = (d: Date, label: string) => (hasVideo ? <SeekTime t={d.getTime()} label={label} /> : label);
 
   const max = Math.max(1, ...t.minutes.map((m) => m.messages));
   const W = 700, H = 90, bw = t.minutes.length ? W / t.minutes.length : W;
@@ -29,6 +40,14 @@ export default async function SessionPage({ params, searchParams }: {
         {t.totals.chatMessages.toLocaleString("de-DE")} Nachrichten · {t.totals.diamonds.toLocaleString("de-DE")} 💎 · Stimmung {Math.round(t.totals.sentiment * 100)}
       </p>
 
+      {hasVideo && (
+        <>
+          <h2>Mitschnitt</h2>
+          <Player src={`/api/recordings/${encodeURIComponent(roomId)}/playlist.m3u8`} index={index} />
+          <p style={{ fontSize: 13, color: "#666" }}>Klick auf eine Uhrzeit bei Höhepunkten oder im Chat, um zu dieser Stelle zu springen.</p>
+        </>
+      )}
+
       <h2>Chat-Aktivität</h2>
       {t.minutes.length === 0 ? <p>Noch keine Daten.</p> : (
         <svg viewBox={`0 0 ${W} ${H + 16}`} width="100%" role="img" aria-label="Chatnachrichten pro Minute">
@@ -41,7 +60,7 @@ export default async function SessionPage({ params, searchParams }: {
           <text x={W} y={H + 13} fontSize="11" textAnchor="end" fill="currentColor">{time(t.minutes[t.minutes.length - 1].minute)}</text>
         </svg>
       )}
-      {t.peaks.length > 0 && <p style={{ fontSize: 14 }}>Höhepunkte: {t.peaks.map(time).join(", ")}</p>}
+      {t.peaks.length > 0 && <p style={{ fontSize: 14 }}>Höhepunkte: {t.peaks.map((p, i) => <span key={i}>{i > 0 && ", "}{at(p, time(p))}</span>)}</p>}
       {t.mentioned.length > 0 && <p style={{ fontSize: 14 }}>Thema im Stream: {t.mentioned.map((m) => `@${m.uniqueId} (${m.mentions}×${m.inTitle ? ", im Titel" : ""})`).join(", ")}</p>}
 
       {polls.length > 0 && <h2>Umfragen</h2>}
@@ -62,7 +81,7 @@ export default async function SessionPage({ params, searchParams }: {
         <table cellPadding={4} style={{ borderCollapse: "collapse", width: "100%", marginTop: 8, fontSize: 14 }}>
           <tbody>{[...chat.items].reverse().map((m) => (
             <tr key={m.id} style={{ borderTop: "1px solid #eee" }}>
-              <td style={{ whiteSpace: "nowrap", color: "#666" }}>{time(m.at)}</td>
+              <td style={{ whiteSpace: "nowrap", color: "#666" }}>{at(m.at, time(m.at))}</td>
               <td style={{ whiteSpace: "nowrap" }}>{m.nickname}</td>
               <td>{m.text}</td>
             </tr>

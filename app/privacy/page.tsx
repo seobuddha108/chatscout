@@ -5,6 +5,7 @@ export const metadata = { title: "Privacy Policy – ChatScout" };
 
 const CHAT_DAYS = Number(process.env.CHAT_RETENTION_DAYS ?? 30);
 const GIFT_DAYS = Number(process.env.GIFT_RETENTION_DAYS ?? 90);
+const VIDEO_DAYS = Number(process.env.VIDEO_RETENTION_DAYS ?? 14);
 
 export default function Privacy() {
   const L = LEGAL;
@@ -79,6 +80,12 @@ export default function Privacy() {
       <p><strong>Your rights as a viewer:</strong> you can object to the processing and request deletion of your messages, either
         with the creator directly or with us at {mail} (please state your TikTok username and the stream). We forward requests to
         the creator or delete the messages on their behalf.</p>
+
+      <h2>8b. Video recording of own streams</h2>
+      <p>Signed-in creators can switch on recording of video and audio of their <strong>own</strong> LIVE streams in the settings.
+        Recordings are stored with {L.hosting.database} (region London (eu-west-2), United Kingdom). Only that creator can play them.
+        They are deleted automatically after {VIDEO_DAYS} days. We process them on the creator&apos;s behalf (Art. 28 GDPR). We do not
+        record video of other creators&apos; streams.</p>
 
       <h2>8a. Recording of followed creators</h2>
       <p><strong>What:</strong> Users with an active package can follow public TikTok creators. We then record their LIVE streams:

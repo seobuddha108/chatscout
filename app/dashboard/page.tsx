@@ -27,7 +27,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const results = q || user ? await searchChat(db, { creatorId: creator.id, q, user, limit: 50, offset: 0 }) : null;
   const now = new Date();
   const followed = await listFollows(db, creator.id);
-  const [me] = await db.select({ noTracking: creators.noTracking }).from(creators).where(eq(creators.id, creator.id));
+  const [me] = await db.select({ noTracking: creators.noTracking, recordVideo: creators.recordVideo }).from(creators).where(eq(creators.id, creator.id));
   const myPolls = await listPolls(db, { creator: creator.uniqueId, period: "month", limit: 5, offset: 0 });
   const pollVoters = await Promise.all(myPolls.items.map((p) => pollDetail(db, p.pollId, creator.id)));
   const refs = await contentReferences(db, { about: creator.uniqueId, period: "month", minMentions: 3, limit: 10, offset: 0 });
@@ -118,8 +118,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <h2>Einstellungen</h2>
       <form action={noTrackingAction} style={{ fontSize: 14 }}>
-        <label><input type="checkbox" name="noTracking" defaultChecked={me?.noTracking} /> Andere dürfen meine Streams nicht aufzeichnen</label>{" "}
-        <button>Speichern</button>
+        <label style={{ display: "block" }}><input type="checkbox" name="recordVideo" defaultChecked={me?.recordVideo} /> Video und Audio meiner eigenen Streams mitschneiden (nur für mich sichtbar, Löschung nach 14 Tagen)</label>
+        <label style={{ display: "block" }}><input type="checkbox" name="noTracking" defaultChecked={me?.noTracking} /> Andere dürfen meine Streams nicht aufzeichnen</label>
+        <button style={{ marginTop: 6 }}>Speichern</button>
       </form>
 
       <h2>API-Schlüssel</h2>

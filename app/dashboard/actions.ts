@@ -3,7 +3,7 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { apiKeys } from "@/db/schema";
+import { apiKeys, creators } from "@/db/schema";
 import { createApiKey, revokeApiKey } from "@/api/keys";
 import { currentCreator } from "@/auth/current";
 
@@ -55,6 +55,8 @@ export async function unfollowAction(formData: FormData) {
 export async function noTrackingAction(formData: FormData) {
   const creator = await currentCreator();
   if (!creator) return;
-  await setNoTracking(await getDb(), creator.id, formData.get("noTracking") === "on");
+  const db = await getDb();
+  await setNoTracking(db, creator.id, formData.get("noTracking") === "on");
+  await db.update(creators).set({ recordVideo: formData.get("recordVideo") === "on" }).where(eq(creators.id, creator.id));
   revalidatePath("/dashboard");
 }

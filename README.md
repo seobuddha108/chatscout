@@ -124,6 +124,18 @@ streams. Creators can opt out in the dashboard (`creators.no_tracking`). This de
 The dashboard pages `/dashboard/c/:creator` (search, streams, polls) and `/dashboard/s/:room` (timeline, polls, chat)
 are only visible to the creator and their followers. In the API, use `GET /api/v1/chat/search?creator=…`.
 
+## Video recording (own streams)
+
+Creators can switch on "Video und Audio meiner eigenen Streams mitschneiden" in the dashboard (`creators.record_video`).
+While their own stream is watched, `src/video/recorder.ts` polls the stream's HLS playlist (found in the room
+info by `src/video/stream-url.ts`, ~720p variant) and copies new segments, without transcoding, into Supabase
+Storage (private bucket `recordings`, `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`). Segments are claimed in
+`recording_segments` before upload, so overlapping cron windows never upload twice.
+
+`/api/recordings/:room/playlist.m3u8` serves a playlist with signed segment URLs. Only the stream's own creator can
+fetch it. On the session page, the player (hls.js) jumps to a moment when you click a time in the peaks or chat.
+Recordings are deleted after `VIDEO_RETENTION_DAYS` (14). Followed creators' streams are never recorded as video.
+
 ## Real LIVE data (TikTok)
 
 `/api/cron/live` runs every minute (Vercel Pro, `maxDuration` 300 s) when `LIVE_SOURCE` includes `tiktok`:

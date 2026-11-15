@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-  bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex,
+  bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
@@ -17,6 +17,8 @@ export const creators = pgTable("creators", {
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   // Set by the verified creator: their streams must not be recorded by followers (opt-out).
   noTracking: boolean("no_tracking").notNull().default(false),
+  // Set by the verified creator: record video/audio of their own streams (off by default: storage).
+  recordVideo: boolean("record_video").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("creators_unique_id_idx").on(t.uniqueId),
@@ -188,4 +190,24 @@ export const follows = pgTable("follows", {
 }, (t) => [
   primaryKey({ columns: [t.followerId, t.creatorId] }),
   index("follows_creator_idx").on(t.creatorId),
+]);
+
+/**
+ * HLS segments of recorded own streams, stored in object storage. One row per segment; the unique
+ * key de-duplicates overlapping recorders (the row is claimed before the upload).
+ */
+export const recordingSegments = pgTable("recording_segments", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => liveSessions.id),
+  segmentKey: text("segment_key").notNull(),
+  seq: integer("seq").notNull(),
+  duration: real("duration").notNull(),
+  programTime: timestamp("program_time", { withTimezone: true }),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  storagePath: text("storage_path").notNull(),
+  bytes: integer("bytes").notNull().default(0),
+  status: text("status").notNull().default("pending"), // pending | stored | failed
+}, (t) => [
+  uniqueIndex("recording_segments_key_idx").on(t.sessionId, t.segmentKey),
+  index("recording_segments_time_idx").on(t.sessionId, t.capturedAt),
 ]);

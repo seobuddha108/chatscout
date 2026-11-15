@@ -77,7 +77,8 @@ export async function watchLive(opts: {
   flush: (events: LiveEvent[]) => Promise<unknown>;
   factory?: ConnectionFactory;
   flushMs?: number;
-  onLive?: (roomId: string) => Promise<unknown> | void;
+  /** Called once connected; may return a cleanup that runs when watching stops (e.g. stop a recorder). */
+  onLive?: (roomId: string, roomInfo: unknown) => Promise<void | (() => Promise<unknown>)> | void | (() => Promise<unknown>);
 }): Promise<WatchResult> {
   const { creator, deadline, flush } = opts;
   let conn: LiveConnection;
@@ -101,6 +102,7 @@ export async function watchLive(opts: {
   };
   const push = (e: LiveEvent | null) => { if (e && roomId) buffer.push(e); };
 
+  let cleanup: (() => Promise<unknown>) | null = null;
   let finish!: (s: "ended" | "deadline" | "disconnected") => void;
   const done = new Promise<"ended" | "deadline" | "disconnected">((r) => (finish = r));
 
@@ -119,7 +121,9 @@ export async function watchLive(opts: {
     const info = state.roomInfo as any;
     const nickname = info?.owner?.nickname || creator.nickname;
     buffer.unshift({ type: "live_start", roomId, creator: { ...creator, nickname }, title: info?.title || undefined, at: new Date() });
-    await opts.onLive?.(roomId);
+    await drain(); // write the session right away, so recorders and dashboards see it immediately
+    const c = await opts.onLive?.(roomId, state.roomInfo);
+    if (typeof c === "function") cleanup = c;
   } catch (err) {
     const e = err as Error;
     if (e?.name === "UserOfflineError" || /offline|not live/i.test(e?.message ?? "")) return { status: "offline" };
@@ -131,6 +135,7 @@ export async function watchLive(opts: {
   const status = await done;
   clearInterval(timer);
   clearTimeout(deadlineTimer);
+  await cleanup?.().catch((e) => console.error("live cleanup failed:", e));
   await drain();
   await conn.disconnect().catch(() => {});
   return { status, roomId, events: total };

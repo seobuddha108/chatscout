@@ -5,6 +5,7 @@ export const metadata = { title: "Datenschutzerklärung – ChatScout" };
 
 const CHAT_DAYS = Number(process.env.CHAT_RETENTION_DAYS ?? 30);
 const GIFT_DAYS = Number(process.env.GIFT_RETENTION_DAYS ?? 90);
+const VIDEO_DAYS = Number(process.env.VIDEO_RETENTION_DAYS ?? 14);
 
 export default function Datenschutz() {
   const L = LEGAL;
@@ -82,6 +83,12 @@ export default function Datenschutz() {
       <p><strong>Deine Rechte als Zuschauer:in:</strong> Du kannst der Verarbeitung widersprechen und die Löschung deiner Nachrichten
         verlangen, direkt beim Creator oder bei uns unter {mail} (bitte TikTok-Benutzernamen und Stream angeben). Wir leiten
         Anfragen an den Creator weiter bzw. löschen die Nachrichten in seinem Auftrag.</p>
+
+      <h2>8b. Video-Mitschnitt eigener Streams</h2>
+      <p>Angemeldete Creator können in den Einstellungen einschalten, dass Video und Audio ihrer <strong>eigenen</strong> LIVE-Streams
+        mitgeschnitten werden. Die Aufnahmen speichern wir bei {L.hosting.database} (Region {L.hosting.databaseRegion}). Nur der jeweilige
+        Creator kann sie abspielen. Sie werden nach {VIDEO_DAYS} Tagen automatisch gelöscht. Wir verarbeiten sie im Auftrag des Creators
+        (Art. 28 DSGVO). In Streams anderer Creator zeichnen wir kein Video auf.</p>
 
       <h2>8a. Aufzeichnung verfolgter Creator</h2>
       <p><strong>Was:</strong> Nutzer:innen mit aktivem Paket können öffentlichen TikTok-Creatorn folgen. Deren LIVE-Streams zeichnen wir

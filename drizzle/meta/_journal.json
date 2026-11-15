@@ -50,6 +50,13 @@
       "when": 1794764551781,
       "tag": "0006_follows",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794765843819,
+      "tag": "0007_video",
+      "breakpoints": true
     }
   ]
 }
