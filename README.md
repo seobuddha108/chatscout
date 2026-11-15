@@ -118,7 +118,7 @@ platform's terms of service before scraping.
 ## Deploying to Vercel
 
 Set `DATABASE_URL` (for example a pooled Neon URL), `CRON_SECRET` and `ADMIN_TOKEN`.
-PGlite does not persist on Vercel. A cron job that runs every 5 minutes needs a Pro plan, because Hobby only allows daily cron jobs.
+PGlite does not persist on Vercel. Functions run in `lhr1` (London), next to the Supabase database (eu-west-2). A cron job that runs every 5 minutes needs a Pro plan, because Hobby only allows daily cron jobs.
 
 ## Supabase
 

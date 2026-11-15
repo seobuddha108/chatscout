@@ -22,7 +22,7 @@ export const LEGAL = {
   hosting: {
     app: "Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, USA",
     database: "Supabase Inc., 970 Toa Payoh North #07-04, Singapore 318992",
-    databaseRegion: "[Region deines Supabase-Projekts, z. B. Frankfurt (eu-central-1)]",
+    databaseRegion: "London (eu-west-2), Vereinigtes Königreich",
   },
   lastUpdated: "15.11.2026",
 };

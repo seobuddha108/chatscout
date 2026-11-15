@@ -32,8 +32,9 @@ export default function Datenschutz() {
       <h2>3. Hosting und Server-Logs</h2>
       <p>Die Anwendung wird bei {L.hosting.app} betrieben, die Datenbank bei {L.hosting.database} in der
         Region {L.hosting.databaseRegion}. Mit beiden Anbietern bestehen Verträge zur Auftragsverarbeitung
-        (Art. 28 DSGVO). Soweit Daten in die USA oder andere Drittländer übermittelt werden, stützen wir uns auf
-        das EU-U.S. Data Privacy Framework bzw. EU-Standardvertragsklauseln (Art. 45, 46 DSGVO).</p>
+        (Art. 28 DSGVO). Für das Vereinigte Königreich besteht ein Angemessenheitsbeschluss der EU-Kommission (Art. 45 DSGVO).
+        Soweit Daten in die USA oder andere Drittländer übermittelt werden, stützen wir uns auf das EU-U.S. Data Privacy
+        Framework bzw. EU-Standardvertragsklauseln (Art. 45, 46 DSGVO).</p>
       <p>Beim Aufruf der Website verarbeitet der Hoster technisch notwendige Daten (IP-Adresse, Zeitpunkt, aufgerufene
         Adresse, Browser-Kennung) in Server-Logs, um den Dienst sicher bereitzustellen und Fehler zu analysieren.
         Rechtsgrundlage ist unser berechtigtes Interesse am sicheren Betrieb (Art. 6 Abs. 1 lit. f DSGVO).
