@@ -7,6 +7,7 @@ export default function Impressum() {
   const L = LEGAL;
   return (
     <LegalPage title="Impressum">
+      <p>{L.productName} ist ein Service der {L.company}.</p>
       <h2>Angaben gemäß § 5 DDG</h2>
       <p>
         {L.company}{L.legalForm && ` ${L.legalForm}`}<br />

@@ -128,3 +128,14 @@ describe("api keys", () => {
     expect(await authenticate(db, key, NOW)).toMatchObject({ ok: false, status: 429 });
   });
 });
+
+describe("gift retention", () => {
+  it("deletes old gift events and orphaned gifters", async () => {
+    const { purgeOldGifts } = await import("@/ingest/ingest");
+    const { gifters } = await import("@/db/schema");
+    await ingestEvents(db, fixture());
+    expect(await purgeOldGifts(db, 90, new Date(NOW.getTime() + 89 * 86_400_000))).toBe(0);
+    expect(await purgeOldGifts(db, 90, new Date(NOW.getTime() + 91 * 86_400_000))).toBe(4);
+    expect(await db.select().from(gifters)).toEqual([]);
+  });
+});

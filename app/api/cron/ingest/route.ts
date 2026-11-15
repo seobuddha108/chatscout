@@ -1,6 +1,6 @@
 import { getDb } from "@/db";
 import { errorJson, hasBearer, json } from "@/api/handler";
-import { closeStaleSessions, purgeExpiredSessions, purgeOldChat, runIngest, sourceFromEnv } from "@/ingest/ingest";
+import { closeStaleSessions, purgeExpiredSessions, purgeOldChat, purgeOldGifts, runIngest, sourceFromEnv } from "@/ingest/ingest";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,5 +13,6 @@ export async function GET(req: Request) {
   const staleClosed = await closeStaleSessions(db);
   const chatPurged = await purgeOldChat(db);
   const sessionsPurged = await purgeExpiredSessions(db);
-  return json({ ok: true, ...result, staleClosed, chatPurged, sessionsPurged });
+  const giftsPurged = await purgeOldGifts(db);
+  return json({ ok: true, ...result, staleClosed, chatPurged, sessionsPurged, giftsPurged });
 }

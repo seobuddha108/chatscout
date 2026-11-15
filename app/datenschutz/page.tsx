@@ -4,6 +4,7 @@ import { LegalPage } from "@/legal/LegalPage";
 export const metadata = { title: "Datenschutzerklärung – ChatScout" };
 
 const CHAT_DAYS = Number(process.env.CHAT_RETENTION_DAYS ?? 30);
+const GIFT_DAYS = Number(process.env.GIFT_RETENTION_DAYS ?? 90);
 
 export default function Datenschutz() {
   const L = LEGAL;
@@ -62,7 +63,8 @@ export default function Datenschutz() {
       </ul>
 
       <h2>7. Zahlungen</h2>
-      <p>[Sobald kostenpflichtige Pakete angeboten werden: Zahlungsdienstleister, übermittelte Daten, Rechtsgrundlage ergänzen.]</p>
+      <p>Derzeit bieten wir ausschließlich einen kostenlosen Testzugang an und verarbeiten keine Zahlungsdaten. Sobald wir
+        kostenpflichtige Pakete einführen, ergänzen wir hier den Zahlungsdienstleister und die dabei verarbeiteten Daten.</p>
 
       <h2>8. Chatnachrichten in den Streams angemeldeter Creator</h2>
       <p><strong>Welche Daten:</strong> Benutzername und Anzeigename der schreibenden Person, Nachrichtentext, Zeitpunkt
@@ -85,7 +87,8 @@ export default function Datenschutz() {
         von Creatorn, Zeitpunkte und Zuschauerzahlen von Streams sowie die Summen virtueller Geschenke, einschließlich
         Benutzername und Anzeigename der schenkenden Personen. Rechtsgrundlage ist unser berechtigtes Interesse, Statistiken
         über öffentliche LIVE-Aktivität bereitzustellen (Art. 6 Abs. 1 lit. f DSGVO). Du kannst jederzeit widersprechen
-        (Abschnitt 11). Wir entfernen dann deine Daten aus den Ranglisten. [Speicherdauer festlegen.]</p>
+        (Abschnitt 11). Wir entfernen dann deine Daten aus den Ranglisten. Einzelne Geschenk-Ereignisse einschließlich der
+        Namen der schenkenden Personen löschen wir automatisch nach {GIFT_DAYS} Tagen.</p>
 
       <h2>9a. Stream-Analysen (Umfragen und Content-Tracking)</h2>
       <p>Aus öffentlichen LIVE-Streams werten wir aus, wie viele Stimmen eine Umfrage pro Antwort erhalten hat, wie viele

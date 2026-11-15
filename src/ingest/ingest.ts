@@ -143,6 +143,16 @@ export async function optedInCreatorIds(db: DB, now = new Date()): Promise<Set<n
   return new Set(rows.map((r) => r.id!));
 }
 
+/** Deletes single gift events (incl. gifter link) older than the retention period, then orphaned gifters. */
+export async function purgeOldGifts(db: DB, days = Number(process.env.GIFT_RETENTION_DAYS ?? 90), now = new Date()) {
+  const cutoff = new Date(now.getTime() - days * 86_400_000);
+  const rows = await db.delete(giftEvents).where(lt(giftEvents.createdAt, cutoff)).returning({ id: giftEvents.id });
+  if (rows.length) {
+    await db.execute(sql`delete from gifters g where not exists (select 1 from gift_events e where e.gifter_id = g.id)`);
+  }
+  return rows.length;
+}
+
 /** Deletes expired dashboard sessions. */
 export async function purgeExpiredSessions(db: DB, now = new Date()) {
   const rows = await db.delete(webSessions).where(lt(webSessions.expiresAt, now)).returning({ id: webSessions.id });

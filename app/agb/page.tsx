@@ -40,12 +40,13 @@ export default function Agb() {
         <li>Zugänge werden als Pakete mit fester Laufzeit (in der Regel 7 Tage) und täglichem Anfragekontingent angeboten. Ein Paket endet
           automatisch mit Ablauf der Laufzeit. Es verlängert sich nicht und muss nicht gekündigt werden.</li>
         <li>Ein kostenloser Testzugang kann ohne Anspruch auf Fortbestand angeboten werden.</li>
-        <li>Es gelten die bei der Buchung angezeigten Preise. [Zahlungsabwicklung und Rechnungsstellung ergänzen, sobald Bezahlung eingebaut ist.]</li>
+        <li>Derzeit ist ausschließlich ein kostenloser Testzugang verfügbar. Für künftige kostenpflichtige Pakete gelten die bei
+          der Buchung angezeigten Preise und Zahlungsbedingungen.</li>
       </ol>
 
       <h2>§ 5 Widerrufsrecht für Verbraucher:innen</h2>
-      <p>[Vor dem Verkauf an Verbraucher:innen: Widerrufsbelehrung und Muster-Widerrufsformular für digitale Dienstleistungen
-        einfügen, einschließlich der Zustimmung zum vorzeitigen Leistungsbeginn (§ 356 Abs. 4 BGB).]</p>
+      <p>Derzeit werden keine kostenpflichtigen Leistungen angeboten. Vor Einführung kostenpflichtiger Pakete stellen wir
+        Verbraucher:innen eine Widerrufsbelehrung und ein Muster-Widerrufsformular zur Verfügung.</p>
 
       <h2>§ 6 Pflichten der Nutzer:innen</h2>
       <ol>
@@ -61,8 +62,8 @@ export default function Agb() {
 
       <h2>§ 7 Auftragsverarbeitung</h2>
       <p>Soweit der Anbieter Chatnachrichten im Auftrag eines Creators verarbeitet, ist der Creator Verantwortlicher und der Anbieter
-        Auftragsverarbeiter im Sinne von Art. 28 DSGVO. Es gilt der Auftragsverarbeitungsvertrag [Link zum AVV einfügen], der mit
-        Annahme dieser AGB Bestandteil des Vertrags wird.</p>
+        Auftragsverarbeiter im Sinne von Art. 28 DSGVO. Einen Vertrag zur Auftragsverarbeitung stellt der Anbieter auf
+        Anfrage an {L.email} zur Verfügung.</p>
 
       <h2>§ 8 Sperrung und Beendigung</h2>
       <p>Der Anbieter kann Zugänge sperren, wenn Nutzer:innen gegen diese AGB oder geltendes Recht verstoßen oder ein begründeter Verdacht
