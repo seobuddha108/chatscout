@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; --page-bg: #ffffff; --page-fg: #0d1222; --link: #0b63ce; }
+@media (prefers-color-scheme: dark) { :root { --page-bg: #070a14; --page-fg: #eef1f8; --link: #7fb6ff; } }
+html { overflow-x: clip; }
+body { background: var(--page-bg); color: var(--page-fg); }
+a { color: var(--link); }

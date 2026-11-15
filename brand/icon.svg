@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111a33"/>
+      <stop offset="1" stop-color="#05070f"/>
+    </linearGradient>
+    <linearGradient id="ac" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2ee6d6"/>
+      <stop offset="1" stop-color="#ff4f8b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <!-- chat bubble -->
+  <rect x="216" y="216" width="540" height="400" rx="84" fill="#ffffff"/>
+  <path d="M316 580 L316 744 L480 600 Z" fill="#ffffff" stroke="#ffffff" stroke-width="24" stroke-linejoin="round"/>
+  <!-- chat lines -->
+  <rect x="320" y="330" width="300" height="40" rx="20" fill="#c9d1e6"/>
+  <rect x="320" y="410" width="210" height="40" rx="20" fill="#c9d1e6"/>
+  <rect x="320" y="490" width="150" height="40" rx="20" fill="#c9d1e6"/>
+  <!-- magnifier -->
+  <circle cx="650" cy="610" r="128" fill="#111a33" stroke="url(#ac)" stroke-width="56"/>
+  <rect x="728" y="700" width="150" height="64" rx="32" transform="rotate(45 728 700)" fill="url(#ac)"/>
+</svg>
