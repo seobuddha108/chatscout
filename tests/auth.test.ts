@@ -36,6 +36,10 @@ describe("TikTok OAuth client", () => {
   it("reads the user and requires a username", async () => {
     const ok = { data: { user: { open_id: "oid", username: "Anna.Live", display_name: "Anna", avatar_url: "https://x/a.jpg" } }, error: { code: "ok" } };
     expect(await fetchUser("at", fakeFetch(200, ok))).toEqual({ openId: "oid", username: "Anna.Live", displayName: "Anna", avatarUrl: "https://x/a.jpg" });
+    const viaLink = { data: { user: { open_id: "oid", display_name: "Anna", profile_web_link: "https://www.tiktok.com/@anna.live?lang=de" } }, error: { code: "ok" } };
+    expect((await fetchUser("at", fakeFetch(200, viaLink))).username).toBe("anna.live");
+    const evilLink = { data: { user: { open_id: "oid", display_name: "A", profile_web_link: "https://tiktok.com.evil.example/@x" } }, error: { code: "ok" } };
+    await expect(fetchUser("at", fakeFetch(200, evilLink))).rejects.toMatchObject({ code: "missing_username" });
     const noName = { data: { user: { open_id: "oid", display_name: "Anna" } }, error: { code: "ok" } };
     await expect(fetchUser("at", fakeFetch(200, noName))).rejects.toMatchObject({ code: "missing_username" });
     const err = { data: {}, error: { code: "access_token_invalid", message: "bad" } };

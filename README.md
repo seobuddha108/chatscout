@@ -46,6 +46,14 @@ LiveSource.poll()  ──►  ingestEvents()  (chat filtered to opted-in creator
 - `src/rankings/`: calendar periods in UTC, league thresholds, and the ranking queries.
 - `src/api/`: API keys (only the SHA-256 hash is stored), plans, and the route wrapper.
 
+## Legal pages
+
+`/impressum`, `/datenschutz` and `/agb` are generated from `src/legal/config.ts`. Fill in every `[...]`
+placeholder. Until you do, the pages show a draft banner. The texts describe the app's real behavior
+(cookies, chat retention, token revocation). They are drafts, so have a lawyer review them before launch.
+Still open: payment provider details, a withdrawal notice for consumers, a DPA (AVV) for creators, and the
+retention period for ranking data.
+
 ## TikTok Login
 
 Flow: `/login`, then `/api/auth/tiktok/start` (sets a state cookie), then TikTok, then

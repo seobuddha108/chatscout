@@ -24,6 +24,8 @@ export default async function Login({ searchParams }: { searchParams: Promise<Re
         </a>
       </p>
       <p style={{ fontSize: 14, color: "#555" }}>
+        Mit der Anmeldung akzeptierst du die <a href="/agb">AGB</a>. Informationen zum Datenschutz findest du in
+        der <a href="/datenschutz">Datenschutzerklärung</a>.<br />
         Wir lesen nur deinen Benutzernamen, Anzeigenamen und dein Profilbild. Den Zugriffstoken von TikTok widerrufen wir sofort danach.
       </p>
       {devLoginEnabled() && (

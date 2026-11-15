@@ -57,20 +57,32 @@ export interface TikTokUser { openId: string; username: string; displayName: str
 
 export async function fetchUser(accessToken: string, f: Fetch = fetch): Promise<TikTokUser> {
   const u = new URL(TIKTOK_ENDPOINTS.userInfo);
-  u.searchParams.set("fields", "open_id,username,display_name,avatar_url");
+  u.searchParams.set("fields", "open_id,username,display_name,avatar_url,profile_web_link");
   const res = await f(u, { headers: { authorization: `Bearer ${accessToken}` } });
   const body = await res.json().catch(() => ({})) as {
-    data?: { user?: { open_id?: string; username?: string; display_name?: string; avatar_url?: string } };
+    data?: { user?: { open_id?: string; username?: string; display_name?: string; avatar_url?: string; profile_web_link?: string } };
     error?: { code?: string; message?: string };
   };
   const user = body.data?.user;
   if (!res.ok || (body.error?.code && body.error.code !== "ok") || !user?.open_id) {
     throw new TikTokAuthError("user_info_failed", `User info failed: ${body.error?.code ?? res.status} ${body.error?.message ?? ""}`.trim());
   }
-  if (!user.username) {
-    throw new TikTokAuthError("missing_username", "TikTok did not return a username. Check that the profile scope is approved and granted.");
+  // user.info.profile lists profile_web_link (https://www.tiktok.com/@handle); use it if username is absent.
+  const username = user.username || usernameFromProfileLink(user.profile_web_link);
+  if (!username) {
+    throw new TikTokAuthError("missing_username", "TikTok did not return a username. Check that user.info.profile is approved and granted.");
   }
-  return { openId: user.open_id, username: user.username, displayName: user.display_name ?? user.username, avatarUrl: user.avatar_url ?? null };
+  return { openId: user.open_id, username, displayName: user.display_name ?? username, avatarUrl: user.avatar_url ?? null };
+}
+
+export function usernameFromProfileLink(link: string | undefined): string | null {
+  if (!link) return null;
+  try {
+    const u = new URL(link);
+    if (!/(^|\.)tiktok\.com$/.test(u.hostname)) return null;
+    const m = u.pathname.match(/^\/@([\w.]{2,24})\/?$/);
+    return m ? m[1] : null;
+  } catch { return null; }
 }
 
 /** Best effort: we don't keep TikTok tokens, so revoke right after reading the profile. */

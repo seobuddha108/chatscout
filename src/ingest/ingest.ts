@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { DB } from "@/db";
-import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions } from "@/db/schema";
+import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions, webSessions } from "@/db/schema";
 import type { CreatorInfo, GifterInfo, LiveEvent, LiveSource } from "./types";
 import { MockSource } from "./mock-source";
 
@@ -134,6 +134,12 @@ export async function optedInCreatorIds(db: DB, now = new Date()): Promise<Set<n
     .innerJoin(creators, eq(creators.id, apiKeys.creatorId))
     .where(and(isNotNull(creators.verifiedAt), isNull(apiKeys.revokedAt), gt(apiKeys.expiresAt, now)));
   return new Set(rows.map((r) => r.id!));
+}
+
+/** Deletes expired dashboard sessions. */
+export async function purgeExpiredSessions(db: DB, now = new Date()) {
+  const rows = await db.delete(webSessions).where(lt(webSessions.expiresAt, now)).returning({ id: webSessions.id });
+  return rows.length;
 }
 
 /** Deletes chat messages older than the retention period. */
