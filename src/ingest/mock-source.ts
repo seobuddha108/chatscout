@@ -27,6 +27,13 @@ const GIFT_TOTAL_WEIGHT = GIFTS.reduce((s, g) => s + g.weight, 0);
 
 export const COUNTRIES = ["DE", "AT", "CH", "US", "GB", "FR", "TR", "BR", "ID", "MX", "ES", "IT"];
 
+const CHAT_LINES = [
+  "hallo zusammen 👋", "wie gehts dir?", "wo kommst du her?", "was spielst du heute?", "giveaway wann?",
+  "geiler stream 🔥", "kannst du mich grüßen?", "first time here", "lol", "❤️❤️❤️", "welches setup hast du?",
+  "link zum merch?", "spam bot hier", "bist du morgen auch live?", "team rot!", "danke für den stream",
+  "@{creator} du bist die beste", "welche kamera ist das", "giveaway pls", "scam link: free-coins.example",
+];
+
 const ADJ = ["lucky", "wild", "cozy", "neon", "lazy", "crazy", "sunny", "pixel", "royal", "dark", "happy", "mighty"];
 const NOUN = ["fox", "tiger", "panda", "gamer", "queen", "chef", "wolf", "star", "dragon", "bear", "cat", "king"];
 
@@ -154,6 +161,14 @@ export class MockSource implements LiveSource {
         type: "gift", roomId, gifter, giftName: gift.name, diamonds: gift.diamonds * repeat,
         at: new Date(from.getTime() + r() * span),
       });
+    }
+    // Chat: roughly 3x as many messages as gifts, from regular fans and anonymous viewers.
+    const chatCount = Math.round(intervals * (3 + popularity * 4) * (0.5 + r()));
+    for (let i = 0; i < chatCount; i++) {
+      const n = Math.floor(r() * 5000);
+      const fan = r() < 0.5 ? pool[Math.floor(Math.pow(r(), 2) * pool.length)] : { uniqueId: `viewer${n}`, nickname: `Viewer ${n}` };
+      const text = pick(r, CHAT_LINES).replace("{creator}", c?.uniqueId ?? "creator");
+      out.push({ type: "chat", roomId, user: { uniqueId: fan.uniqueId, nickname: fan.nickname }, text, at: new Date(from.getTime() + r() * span) });
     }
     out.push({ type: "viewers", roomId, viewers: Math.round(popularity * (20 + r() * 200)), at: to });
     return out;

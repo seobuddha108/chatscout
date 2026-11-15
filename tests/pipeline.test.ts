@@ -37,7 +37,7 @@ function fixture(): LiveEvent[] {
 describe("ingest", () => {
   it("stores events, skips unknown rooms and is idempotent for starts/ends", async () => {
     const first = await ingestEvents(db, fixture());
-    expect(first).toEqual({ sessionsStarted: 3, sessionsEnded: 1, gifts: 4, skipped: 1 });
+    expect(first).toEqual({ sessionsStarted: 3, sessionsEnded: 1, gifts: 4, chats: 0, chatsDropped: 0, skipped: 1 });
     const again = await ingestEvents(db, fixture().filter((e) => e.type !== "gift"));
     expect(again.sessionsStarted).toBe(0);
     expect(again.sessionsEnded).toBe(0);

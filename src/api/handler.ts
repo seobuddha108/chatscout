@@ -9,9 +9,13 @@ export const json = (body: unknown, status = 200, headers: Record<string, string
 
 export const errorJson = (status: number, error: string, extra: object = {}) => json({ error, ...extra }, status);
 
-interface Ctx<Q> { db: DB; query: Q; plan: Plan; maxLimit: number; req: Request }
+interface Ctx<Q> { db: DB; query: Q; plan: Plan; creatorId: number | null; maxLimit: number; req: Request }
 
 /** Wraps a v1 route: API key auth + quota, query validation, uniform errors. */
+/** Chat endpoints need a key that is bound to a creator account. */
+export const needsCreator = () =>
+  errorJson(403, "This key is not linked to a creator account. Chat search only works for your own streams.");
+
 export function apiRoute<S extends z.ZodType, P = unknown>(
   schema: S,
   handler: (ctx: Ctx<z.infer<S>>, params: P) => Promise<unknown>,
@@ -34,8 +38,12 @@ export function apiRoute<S extends z.ZodType, P = unknown>(
       }
       const maxLimit = PLANS[auth.plan].maxLimit;
       const params = (await routeCtx?.params) as P;
-      const data = await handler({ db, query: parsed.data, plan: auth.plan, maxLimit, req }, params);
+      const data = await handler({ db, query: parsed.data, plan: auth.plan, creatorId: auth.creatorId, maxLimit, req }, params);
       if (data === null) return json({ error: "Not found." }, 404, rate);
+      if (data instanceof Response) {
+        for (const [k, v] of Object.entries(rate)) data.headers.set(k, v);
+        return data;
+      }
       return json({ data }, 200, rate);
     } catch (err) {
       console.error(err);

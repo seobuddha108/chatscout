@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { DB } from "@/db";
-import { creators, giftEvents, gifters, liveSessions } from "@/db/schema";
+import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions } from "@/db/schema";
 import type { CreatorInfo, GifterInfo, LiveEvent, LiveSource } from "./types";
 import { MockSource } from "./mock-source";
 
@@ -10,6 +10,8 @@ export interface IngestResult {
   sessionsStarted: number;
   sessionsEnded: number;
   gifts: number;
+  chats: number;
+  chatsDropped: number; // chat from creators without an active ChatScout key (not stored)
   skipped: number; // events for rooms we have never seen a live_start for
 }
 
@@ -19,6 +21,7 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   const ends = new Map<string, Date>();
   const peak = new Map<string, number>();
   const gifts: Extract<LiveEvent, { type: "gift" }>[] = [];
+  const chats: Extract<LiveEvent, { type: "chat" }>[] = [];
   const creatorInfo = new Map<string, CreatorInfo>();
   const gifterInfo = new Map<string, GifterInfo>();
 
@@ -28,6 +31,7 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
       case "live_end": ends.set(e.roomId, e.at); break;
       case "viewers": peak.set(e.roomId, Math.max(peak.get(e.roomId) ?? 0, e.viewers)); break;
       case "gift": gifts.push(e); gifterInfo.set(e.gifter.uniqueId, e.gifter); break;
+      case "chat": chats.push(e); break;
     }
   }
 
@@ -37,7 +41,7 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     const rows = await db.insert(creators).values(batch).onConflictDoUpdate({
       target: creators.uniqueId,
       set: {
-        nickname: sql`excluded.nickname`, country: sql`excluded.country`,
+        nickname: sql`excluded.nickname`, country: sql`coalesce(excluded.country, ${creators.country})`,
         category: sql`excluded.category`, avatarUrl: sql`coalesce(excluded.avatar_url, ${creators.avatarUrl})`,
       },
     }).returning({ id: creators.id, uniqueId: creators.uniqueId });
@@ -62,7 +66,9 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   }
 
   // 3. Resolve every room referenced in this batch.
-  const roomIds = [...new Set([...starts.keys(), ...ends.keys(), ...peak.keys(), ...gifts.map((g) => g.roomId)])];
+  const roomIds = [...new Set([
+    ...starts.keys(), ...ends.keys(), ...peak.keys(), ...gifts.map((g) => g.roomId), ...chats.map((c) => c.roomId),
+  ])];
   const rooms = new Map<string, { id: number; creatorId: number }>();
   for (const batch of chunks(roomIds)) {
     const rows = await db.select({ id: liveSessions.id, creatorId: liveSessions.creatorId, room: liveSessions.externalRoomId })
@@ -83,6 +89,23 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   }
   for (const batch of chunks(giftRows)) await db.insert(giftEvents).values(batch);
 
+  // 4b. Chat — only for creators who opted in. Everyone else's chat is never written.
+  let chatsDropped = 0;
+  const chatRows = [];
+  if (chats.length) {
+    const optedIn = await optedInCreatorIds(db);
+    for (const c of chats) {
+      const room = rooms.get(c.roomId);
+      if (!room) { skipped++; continue; }
+      if (!optedIn.has(room.creatorId)) { chatsDropped++; continue; }
+      chatRows.push({
+        sessionId: room.id, creatorId: room.creatorId, chatterUniqueId: c.user.uniqueId.toLowerCase(),
+        chatterNickname: c.user.nickname, text: c.text.slice(0, 500), createdAt: c.at,
+      });
+    }
+    for (const batch of chunks(chatRows)) await db.insert(chatMessages).values(batch);
+  }
+
   // 5. Peak viewers and session ends, one UPDATE ... FROM (VALUES ...) per chunk.
   const peakRows = [...peak].filter(([room]) => rooms.has(room));
   skipped += peak.size - peakRows.length;
@@ -102,7 +125,21 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     sessionsEnded += rowCount(res);
   }
 
-  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, skipped };
+  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, skipped };
+}
+
+/** Creators with at least one active (not revoked, not expired) key. */
+export async function optedInCreatorIds(db: DB, now = new Date()): Promise<Set<number>> {
+  const rows = await db.selectDistinct({ id: apiKeys.creatorId }).from(apiKeys)
+    .where(and(isNotNull(apiKeys.creatorId), isNull(apiKeys.revokedAt), gt(apiKeys.expiresAt, now)));
+  return new Set(rows.map((r) => r.id!));
+}
+
+/** Deletes chat messages older than the retention period. */
+export async function purgeOldChat(db: DB, days = Number(process.env.CHAT_RETENTION_DAYS ?? 30), now = new Date()) {
+  const cutoff = new Date(now.getTime() - days * 86_400_000);
+  const rows = await db.delete(chatMessages).where(lt(chatMessages.createdAt, cutoff)).returning({ id: chatMessages.id });
+  return rows.length;
 }
 
 /** One pipeline run: ask the source for new events given what is live, then store them. */

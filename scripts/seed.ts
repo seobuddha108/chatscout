@@ -1,4 +1,5 @@
 import { getDb } from "../src/db";
+import { createApiKey } from "../src/api/keys";
 import { ingestEvents, runIngest } from "../src/ingest/ingest";
 import { MockSource } from "../src/ingest/mock-source";
 
@@ -7,6 +8,11 @@ const days = Number(process.argv[2] ?? 7);
 const db = await getDb();
 const source = new MockSource();
 const now = new Date();
+
+// Opt in the first creator so their chat gets stored (others' chat is dropped).
+const demo = source.creators[0].uniqueId;
+const { key } = await createApiKey(db, { name: "demo creator", plan: "pro", creator: demo });
+console.log(`Demo creator @${demo}, API key: ${key}`);
 
 const t0 = Date.now();
 const history = source.history(days, now);

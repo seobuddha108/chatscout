@@ -8,10 +8,11 @@ export const dynamic = "force-dynamic";
 const body = z.object({
   name: z.string().min(1).max(100),
   plan: z.enum(["basic", "pro", "business"]),
+  creator: z.string().regex(/^@?[\w.]{2,24}$/, "TikTok username").optional(),
   days: z.number().int().min(1).max(365).default(7),
 });
 
-/** POST /api/admin/keys {name, plan, days} — later called by the payment webhook. */
+/** POST /api/admin/keys {name, plan, creator, days} — later called by the payment webhook. */
 export async function POST(req: Request) {
   if (!hasBearer(req, process.env.ADMIN_TOKEN)) return errorJson(401, "Unauthorized.");
   const parsed = body.safeParse(await req.json().catch(() => null));

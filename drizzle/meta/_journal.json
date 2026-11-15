@@ -15,6 +15,13 @@
       "when": 1794746744265,
       "tag": "0001_enable_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794747047552,
+      "tag": "0002_chat",
+      "breakpoints": true
     }
   ]
 }

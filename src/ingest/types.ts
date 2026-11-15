@@ -7,7 +7,7 @@ export type Category = "general" | "gaming";
 export interface CreatorInfo {
   uniqueId: string;
   nickname: string;
-  country: string;
+  country?: string;
   category: Category;
   avatarUrl?: string;
 }
@@ -22,6 +22,7 @@ export type LiveEvent =
   | { type: "live_start"; roomId: string; creator: CreatorInfo; title?: string; at: Date }
   | { type: "viewers"; roomId: string; viewers: number; at: Date }
   | { type: "gift"; roomId: string; gifter: GifterInfo; giftName: string; diamonds: number; at: Date }
+  | { type: "chat"; roomId: string; user: { uniqueId: string; nickname: string }; text: string; at: Date }
   | { type: "live_end"; roomId: string; at: Date };
 
 export interface OpenSession {

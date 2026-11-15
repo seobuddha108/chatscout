@@ -1,17 +1,30 @@
-# Live Rankings API
+# ChatScout
 
-Data pipeline and REST API for LIVE creator rankings, leagues and gifter
-leaderboards per country. It currently runs on **mock data**. A real source is
-connected by implementing a single interface (see below).
+Creators search the chat of their **own** TikTok LIVE streams by keywords and users.
+Typical uses are finding giveaway entries, spotting spam or scam links, seeing who
+the regulars are, and reviewing moderation cases. It also offers LIVE rankings and
+gifter leaderboards. It currently runs on **mock data**. A real source is connected
+by implementing a single interface (see below).
+
+## Privacy model
+
+- Chat is **only stored for creators with an active key** (`api_keys.creator_id`).
+  Chat from every other stream is dropped during ingest and never written.
+- A key only ever sees its own creator's chat. There is no search across creators.
+- Retention: chat older than `CHAT_RETENTION_DAYS` (default 30) is deleted by the cron job.
+- Erasure: `DELETE /api/v1/chat/chatters/:user` removes one chatter's messages.
+- **Before launch:** verify that a key holder really owns the TikTok account, for
+  example with TikTok Login Kit (OAuth), before binding a key to `creator`. Right
+  now an admin sets this binding by hand.
 
 ## Quick start
 
 ```bash
 npm install
-npm run db:seed            # 7 days of mock history, stored in ./.data/pglite
-npm run key:create -- me pro 7
+npm run db:seed            # 7 days of mock history; prints a demo creator key
+npm run key:create -- me pro 7 <tiktok_username>   # key bound to a creator
 npm run dev
-curl -H "Authorization: Bearer <key>" "localhost:3000/api/v1/rankings/creators?country=DE&period=week"
+curl -G -H "x-api-key: <key>" localhost:3000/api/v1/chat/search --data-urlencode "q=giveaway -scam"
 ```
 
 Without `DATABASE_URL`, the app uses an embedded Postgres (PGlite) that migrates
@@ -20,7 +33,7 @@ itself. With `DATABASE_URL` set, it uses real Postgres. Run `npm run db:migrate`
 ## Architecture
 
 ```
-LiveSource.poll()  ──►  ingestEvents()  ──►  Postgres  ──►  /api/v1/*  (API key + daily quota)
+LiveSource.poll()  ──►  ingestEvents()  (chat filtered to opted-in creators)  ──►  Postgres  ──►  /api/v1/*  (API key + daily quota)
  (mock | connector)     batched upserts      gift_events      rankings computed with SQL
         ▲
   /api/cron/ingest (Vercel Cron, every 5 min)
@@ -29,6 +42,7 @@ LiveSource.poll()  ──►  ingestEvents()  ──►  Postgres  ──►  /a
 - `src/ingest/types.ts`: normalized events (`live_start`, `gift`, `viewers`, `live_end`) and the `LiveSource` interface.
 - `src/ingest/mock-source.ts`: a deterministic fake source with 12 countries and heavy-tailed gift amounts.
 - `src/ingest/ingest.ts`: a bulk writer that deduplicates its input. Repeating start and end events is safe.
+- `src/chat/queries.ts`: chat search using Postgres full-text search (`tsvector`, config `simple`, GIN index), chatter stats, and erasure.
 - `src/rankings/`: calendar periods in UTC, league thresholds, and the ranking queries.
 - `src/api/`: API keys (only the SHA-256 hash is stored), plans, and the route wrapper.
 
@@ -36,13 +50,16 @@ LiveSource.poll()  ──►  ingestEvents()  ──►  Postgres  ──►  /a
 
 | Endpoint | Query |
 |---|---|
+| `GET /api/v1/chat/search` | `q` (all words must match, prefix match, `-word` excludes), `user`, `session` (roomId), `from`, `to`, `limit`, `offset` |
+| `GET /api/v1/chat/chatters` | `period`, `date`, `prefix`, `limit`, `offset`: most active chatters |
+| `DELETE /api/v1/chat/chatters/:user` | erases that chatter's messages |
 | `GET /api/v1/rankings/creators` | `country`, `period` (day/week/month), `date` (YYYY-MM-DD), `category` (general/gaming), `league` (S–D), `limit`, `offset` |
 | `GET /api/v1/rankings/gifters` | `country`, `period`, `date`, `creator`, `limit`, `offset` |
 | `GET /api/v1/creators/:uniqueId` | `date` |
 | `GET /api/v1/countries` | `period`, `date` |
 | `GET /api/v1/leagues` | `period` |
 | `GET /api/cron/ingest` | needs `Authorization: Bearer $CRON_SECRET` |
-| `POST /api/admin/keys` | needs `Authorization: Bearer $ADMIN_TOKEN`, body `{name, plan, days}` |
+| `POST /api/admin/keys` | needs `Authorization: Bearer $ADMIN_TOKEN`, body `{name, plan, days, creator}` |
 
 Plans are defined in `src/api/plans.ts` (basic/pro/business: requests per day and maximum `limit`).
 

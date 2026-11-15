@@ -1,4 +1,4 @@
-export const metadata = { title: "Live Rankings API" };
+export const metadata = { title: "ChatScout API" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

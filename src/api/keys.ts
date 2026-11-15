@@ -1,24 +1,32 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { DB } from "@/db";
-import { apiKeys, apiUsage } from "@/db/schema";
+import { apiKeys, apiUsage, creators } from "@/db/schema";
 import { PLANS, type Plan } from "./plans";
 
 export const hashKey = (key: string) => createHash("sha256").update(key).digest("hex");
 
 /** Creates a key; the raw key is returned once and only its hash is stored. */
-export async function createApiKey(db: DB, opts: { name: string; plan: Plan; days?: number; now?: Date }) {
-  const key = `lr_${randomBytes(24).toString("base64url")}`;
+export async function createApiKey(db: DB, opts: { name: string; plan: Plan; creator?: string; days?: number; now?: Date }) {
+  const key = `cs_${randomBytes(24).toString("base64url")}`;
+  let creatorId: number | null = null;
+  if (opts.creator) {
+    // The creator may not have been seen live yet; create a stub that ingest fills in later.
+    const uniqueId = opts.creator.replace(/^@/, "").toLowerCase();
+    await db.insert(creators).values({ uniqueId, nickname: uniqueId }).onConflictDoNothing();
+    const [c] = await db.select({ id: creators.id }).from(creators).where(eq(creators.uniqueId, uniqueId));
+    creatorId = c.id;
+  }
   const now = opts.now ?? new Date();
   const expiresAt = new Date(now.getTime() + (opts.days ?? 7) * 86_400_000);
   const [row] = await db.insert(apiKeys).values({
-    name: opts.name, plan: opts.plan, prefix: key.slice(0, 10), keyHash: hashKey(key), expiresAt,
+    name: opts.name, plan: opts.plan, creatorId, prefix: key.slice(0, 10), keyHash: hashKey(key), expiresAt,
   }).returning({ id: apiKeys.id });
-  return { id: row.id, key, plan: opts.plan, expiresAt };
+  return { id: row.id, key, plan: opts.plan, creator: opts.creator ?? null, expiresAt };
 }
 
 export type AuthResult =
-  | { ok: true; keyId: number; plan: Plan; limit: number; remaining: number; expiresAt: Date }
+  | { ok: true; keyId: number; plan: Plan; creatorId: number | null; limit: number; remaining: number; expiresAt: Date }
   | { ok: false; status: 401 | 403 | 429; error: string; limit?: number };
 
 /** Validates a raw key and counts one request against today's quota (UTC). */
@@ -36,7 +44,7 @@ export async function authenticate(db: DB, rawKey: string | null, now = new Date
     .onConflictDoUpdate({ target: [apiUsage.keyId, apiUsage.day], set: { count: sql`${apiUsage.count} + 1` } })
     .returning({ count: apiUsage.count });
   if (usage.count > limit) return { ok: false, status: 429, error: "Daily request limit reached.", limit };
-  return { ok: true, keyId: key.id, plan, limit, remaining: limit - usage.count, expiresAt: key.expiresAt };
+  return { ok: true, keyId: key.id, plan, creatorId: key.creatorId, limit, remaining: limit - usage.count, expiresAt: key.expiresAt };
 }
 
 export async function revokeApiKey(db: DB, id: number) {
