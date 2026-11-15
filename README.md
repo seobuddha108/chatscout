@@ -57,3 +57,23 @@ platform's terms of service before scraping.
 
 Set `DATABASE_URL` (for example a pooled Neon URL), `CRON_SECRET` and `ADMIN_TOKEN`.
 PGlite does not persist on Vercel. A cron job that runs every 5 minutes needs a Pro plan, because Hobby only allows daily cron jobs.
+
+## Supabase
+
+1. Create a project. Under **Connect**, copy two connection strings:
+   - **Transaction pooler** (port 6543): set as `DATABASE_URL` for the app and Vercel.
+   - **Session pooler / Direct** (port 5432): set as `DIRECT_URL` for migrations.
+2. Run `DIRECT_URL=... npm run db:migrate` once.
+3. Row Level Security is enabled on every table with no policies (migration 0001). The
+   Supabase Data API therefore exposes nothing, including `api_keys`. The app's own
+   connection uses the `postgres` role and is not affected by RLS.
+4. Optional: trigger the ingest from inside Supabase instead of Vercel Cron, so it also runs every 5 minutes on Vercel Hobby.
+   Enable the `pg_cron` and `pg_net` extensions, then run:
+   ```sql
+   select cron.schedule('ingest', '*/5 * * * *', $$
+     select net.http_get(
+       url := 'https://<your-app>.vercel.app/api/cron/ingest',
+       headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>'));
+   $$);
+   ```
+   Then remove the `crons` entry from `vercel.json`.

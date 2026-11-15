@@ -44,7 +44,8 @@ export async function createPgliteDb(dataDir: string): Promise<DB> {
 
 /** Applies migrations to the configured database (used by `npm run db:migrate`). */
 export async function migrateConfiguredDb(): Promise<void> {
-  const url = process.env.DATABASE_URL;
+  // DIRECT_URL: a non-pooled connection (e.g. Supabase port 5432) for DDL; falls back to DATABASE_URL.
+  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
   if (!url) {
     await getDb(); // PGlite migrates on connect
     return;
