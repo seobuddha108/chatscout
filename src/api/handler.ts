@@ -14,7 +14,7 @@ interface Ctx<Q> { db: DB; query: Q; plan: Plan; creatorId: number | null; maxLi
 /** Wraps a v1 route: API key auth + quota, query validation, uniform errors. */
 /** Chat endpoints need a key that is bound to a creator account. */
 export const needsCreator = () =>
-  errorJson(403, "This key is not linked to a creator account. Chat search only works for your own streams.");
+  errorJson(403, "This key is not linked to a verified creator account. Log in with TikTok first; chat search only covers your own streams.");
 
 export function apiRoute<S extends z.ZodType, P = unknown>(
   schema: S,

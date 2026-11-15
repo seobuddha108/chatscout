@@ -7,6 +7,10 @@ import { createApiKey, revokeApiKey } from "@/api/keys";
 import { deleteChatterMessages, searchChat, toTsQuery, topChatters } from "@/chat/queries";
 import { creators } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { linkTikTokAccount } from "@/auth/link";
+
+const verify = (db: DB, username: string) =>
+  linkTikTokAccount(db, { openId: `oid-${username}`, username, displayName: username, avatarUrl: null });
 
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 10, 11, h, m));
 let db: DB;
@@ -18,6 +22,7 @@ const chat = (roomId: string, user: string, text: string, m: number): LiveEvent 
 beforeEach(async () => {
   db = await createPgliteDb("memory://");
   await createApiKey(db, { name: "anna", plan: "pro", creator: "@Anna", now: at(9) });
+  await verify(db, "anna");
   annaId = (await db.select().from(creators).where(eq(creators.uniqueId, "anna")))[0].id;
   await ingestEvents(db, [
     { type: "live_start", roomId: "r1", creator: { uniqueId: "anna", nickname: "Anna", country: "DE", category: "general" }, at: at(10) },
@@ -41,6 +46,8 @@ describe("chat ingest", () => {
 
   it("drops chat after the key is revoked", async () => {
     const { id } = await createApiKey(db, { name: "ben", plan: "basic", creator: "ben", now: at(9) });
+    expect(await ingestEvents(db, [chat("r2", "x", "hi", 6)])).toMatchObject({ chats: 0, chatsDropped: 1 }); // not verified yet
+    await verify(db, "ben");
     expect((await ingestEvents(db, [chat("r2", "x", "hi", 6)])).chats).toBe(1);
     await revokeApiKey(db, id);
     expect(await ingestEvents(db, [chat("r2", "x", "hi", 7)])).toMatchObject({ chats: 0, chatsDropped: 1 });
@@ -50,6 +57,7 @@ describe("chat ingest", () => {
     const src = new MockSource({ creatorsPerCountry: 2, giftersPerCountry: 5 });
     src.reseed(3);
     await createApiKey(db, { name: "m", plan: "pro", creator: src.creators[0].uniqueId });
+    await verify(db, src.creators[0].uniqueId);
     const ev = src.history(7, new Date()); // 7 days so creator 0 surely streamed
     const res = await ingestEvents(db, ev);
     expect(res.chats).toBeGreaterThan(0);

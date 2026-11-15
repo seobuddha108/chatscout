@@ -32,7 +32,11 @@ export type AuthResult =
 /** Validates a raw key and counts one request against today's quota (UTC). */
 export async function authenticate(db: DB, rawKey: string | null, now = new Date()): Promise<AuthResult> {
   if (!rawKey) return { ok: false, status: 401, error: "Missing API key. Send 'Authorization: Bearer <key>' or 'x-api-key'." };
-  const [key] = await db.select().from(apiKeys)
+  const [key] = await db.select({
+    id: apiKeys.id, plan: apiKeys.plan, expiresAt: apiKeys.expiresAt,
+    // Chat access only counts once the bound creator has verified via TikTok Login.
+    creatorId: sql<number | null>`case when ${creators.verifiedAt} is not null then ${creators.id} end`,
+  }).from(apiKeys).leftJoin(creators, eq(creators.id, apiKeys.creatorId))
     .where(and(eq(apiKeys.keyHash, hashKey(rawKey)), isNull(apiKeys.revokedAt))).limit(1);
   if (!key) return { ok: false, status: 401, error: "Invalid API key." };
   if (key.expiresAt <= now) return { ok: false, status: 403, error: "API key expired. Buy a new package." };

@@ -13,9 +13,9 @@ by implementing a single interface (see below).
 - A key only ever sees its own creator's chat. There is no search across creators.
 - Retention: chat older than `CHAT_RETENTION_DAYS` (default 30) is deleted by the cron job.
 - Erasure: `DELETE /api/v1/chat/chatters/:user` removes one chatter's messages.
-- **Before launch:** verify that a key holder really owns the TikTok account, for
-  example with TikTok Login Kit (OAuth), before binding a key to `creator`. Right
-  now an admin sets this binding by hand.
+- **Ownership is proven with TikTok Login.** Chat is only collected and searchable for
+  creators with `verified_at` set. A key that an admin binds to an unverified username
+  gets no chat access.
 
 ## Quick start
 
@@ -45,6 +45,29 @@ LiveSource.poll()  ──►  ingestEvents()  (chat filtered to opted-in creator
 - `src/chat/queries.ts`: chat search using Postgres full-text search (`tsvector`, config `simple`, GIN index), chatter stats, and erasure.
 - `src/rankings/`: calendar periods in UTC, league thresholds, and the ranking queries.
 - `src/api/`: API keys (only the SHA-256 hash is stored), plans, and the route wrapper.
+
+## TikTok Login
+
+Flow: `/login`, then `/api/auth/tiktok/start` (sets a state cookie), then TikTok, then
+`/api/auth/tiktok/callback`. The callback checks the state, exchanges the code, reads
+`open_id` and `username`, **revokes the TikTok token immediately** (none is stored),
+links the creator by `open_id` (so username changes are followed), starts a session
+cookie, and redirects to `/dashboard`.
+
+The dashboard offers chat search in the browser, a self-service 7-day trial key, and key revocation.
+
+Setup:
+1. Create an app on developers.tiktok.com and add the Login Kit product.
+2. Register the redirect URI `https://<APP_URL>/api/auth/tiktok/callback` (must be https).
+3. Request a scope that returns `username` (default `user.info.basic,user.info.profile`;
+   override with `TIKTOK_SCOPES`). The app needs TikTok's review before it works for any account.
+4. Set `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`, `APP_URL`.
+
+For local development without TikTok, set `ALLOW_DEV_LOGIN=1` and run `npm run dev`. The login page then shows a
+username form. This form is never available in production builds.
+
+The endpoint URLs are defaults in `src/auth/tiktok.ts` and can be overridden via env.
+They were written without access to TikTok's docs, so check them against the current Login Kit docs before launch.
 
 ## Endpoints
 

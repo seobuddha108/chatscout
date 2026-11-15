@@ -14,6 +14,7 @@ export default function Home() {
     <main>
       <h1>ChatScout API</h1>
       <p>Search the chat of your own TikTok LIVE streams by keywords and users. Plus LIVE rankings and gifter leaderboards.</p>
+      <p><a href="/login">Für Creator: mit TikTok anmelden →</a></p>
       <p>Chat search is only available for keys linked to a creator account and only covers that creator&apos;s streams.</p>
       <p>Authenticate with <code>Authorization: Bearer &lt;key&gt;</code> or <code>x-api-key</code>.</p>
       <table cellPadding={6} style={{ borderCollapse: "collapse" }}>

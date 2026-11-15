@@ -12,9 +12,13 @@ export const creators = pgTable("creators", {
   country: text("country"), // ISO 3166-1 alpha-2; null until known
   category: text("category").notNull().default("general"), // "general" | "gaming"
   avatarUrl: text("avatar_url"),
+  // Set when the creator proved account ownership via TikTok Login. Stable across username changes.
+  tiktokOpenId: text("tiktok_open_id"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("creators_unique_id_idx").on(t.uniqueId),
+  uniqueIndex("creators_tiktok_open_id_idx").on(t.tiktokOpenId),
   index("creators_country_idx").on(t.country, t.category),
 ]);
 
@@ -88,3 +92,12 @@ export const chatMessages = pgTable("chat_messages", {
   index("chat_creator_chatter_idx").on(t.creatorId, t.chatterUniqueId, t.createdAt),
   index("chat_tsv_idx").using("gin", t.tsv),
 ]);
+
+/** Browser sessions for the creator dashboard. Only the token hash is stored. */
+export const webSessions = pgTable("web_sessions", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash").notNull(),
+  creatorId: integer("creator_id").notNull().references(() => creators.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("web_sessions_token_idx").on(t.tokenHash)]);

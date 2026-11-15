@@ -128,10 +128,11 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, skipped };
 }
 
-/** Creators with at least one active (not revoked, not expired) key. */
+/** Creators verified via TikTok Login that also hold an active (not revoked, not expired) key. */
 export async function optedInCreatorIds(db: DB, now = new Date()): Promise<Set<number>> {
   const rows = await db.selectDistinct({ id: apiKeys.creatorId }).from(apiKeys)
-    .where(and(isNotNull(apiKeys.creatorId), isNull(apiKeys.revokedAt), gt(apiKeys.expiresAt, now)));
+    .innerJoin(creators, eq(creators.id, apiKeys.creatorId))
+    .where(and(isNotNull(creators.verifiedAt), isNull(apiKeys.revokedAt), gt(apiKeys.expiresAt, now)));
   return new Set(rows.map((r) => r.id!));
 }
 
