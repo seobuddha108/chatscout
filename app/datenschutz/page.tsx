@@ -11,7 +11,7 @@ export default function Datenschutz() {
   const mail = <a href={`mailto:${L.privacyEmail}`}>{L.privacyEmail}</a>;
   return (
     <LegalPage title="Datenschutzerklärung">
-      <p>Stand: {L.lastUpdated}</p>
+      <p>Stand: {L.lastUpdated} · <a href="/privacy" hrefLang="en">English version</a></p>
 
       <h2>1. Verantwortlicher</h2>
       <p>

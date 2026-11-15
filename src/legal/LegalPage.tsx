@@ -1,8 +1,8 @@
 import { legalIsDraft } from "./config";
 
-export function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
+export function LegalPage({ title, children, lang }: { title: string; children: React.ReactNode; lang?: string }) {
   return (
-    <main className="legal">
+    <main className="legal" lang={lang}>
       {legalIsDraft() && (
         <p role="note" style={{ background: "#fff4ce", border: "1px solid #e0b400", padding: "10px 14px", borderRadius: 6 }}>
           <strong>Entwurf:</strong> Angaben in eckigen Klammern sind noch nicht ausgefüllt

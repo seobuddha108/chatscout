@@ -10,7 +10,7 @@ export default function Agb() {
   const P = L.productName;
   return (
     <LegalPage title="Allgemeine Geschäftsbedingungen">
-      <p>Stand: {L.lastUpdated}</p>
+      <p>Stand: {L.lastUpdated} · <a href="/terms" hrefLang="en">English version</a></p>
 
       <h2>§ 1 Geltungsbereich und Anbieter</h2>
       <p>Diese AGB gelten für die Nutzung von {P} (Website, Dashboard und API), angeboten von {L.company}
