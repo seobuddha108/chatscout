@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, lt, sql, type SQL } from "drizzle-orm";
 import type { DB } from "@/db";
-import { chatMessages, liveSessions } from "@/db/schema";
+import { chatMessages, liveSessions, pollVoters, polls } from "@/db/schema";
 
 export interface ChatSearchParams {
   creatorId: number;
@@ -84,10 +84,16 @@ export async function topChatters(db: DB, p: { creatorId: number; from: Date; to
 
 /** GDPR erasure: removes all stored messages of one chatter from the creator's data. */
 export async function deleteChatterMessages(db: DB, creatorId: number, user: string) {
+  const u = normalizeUser(user);
   const rows = await db.delete(chatMessages)
-    .where(and(eq(chatMessages.creatorId, creatorId), eq(chatMessages.chatterUniqueId, normalizeUser(user))))
+    .where(and(eq(chatMessages.creatorId, creatorId), eq(chatMessages.chatterUniqueId, u)))
     .returning({ id: chatMessages.id });
-  return rows.length;
+  // Also erase their named poll votes in this creator's streams.
+  const votes = await db.delete(pollVoters).where(and(
+    eq(pollVoters.voterUniqueId, u),
+    sql`${pollVoters.pollId} in (select ${polls.id} from ${polls} where ${polls.creatorId} = ${creatorId})`,
+  )).returning({ id: pollVoters.pollId });
+  return rows.length + votes.length;
 }
 
 const normalizeUser = (u: string) => u.trim().replace(/^@/, "").toLowerCase();

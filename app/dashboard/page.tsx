@@ -5,6 +5,7 @@ import { apiKeys } from "@/db/schema";
 import { currentCreator } from "@/auth/current";
 import { optedInCreatorIds } from "@/ingest/ingest";
 import { searchChat } from "@/chat/queries";
+import { contentReferences, listPolls, pollDetail } from "@/analytics/queries";
 import { revokeKey } from "./actions";
 import { CreateKey } from "./create-key";
 
@@ -22,6 +23,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const collecting = (await optedInCreatorIds(db)).has(creator.id);
   const results = q || user ? await searchChat(db, { creatorId: creator.id, q, user, limit: 50, offset: 0 }) : null;
   const now = new Date();
+  const myPolls = await listPolls(db, { creator: creator.uniqueId, period: "month", limit: 5, offset: 0 });
+  const pollVoters = await Promise.all(myPolls.items.map((p) => pollDetail(db, p.pollId, creator.id)));
+  const refs = await contentReferences(db, { about: creator.uniqueId, period: "month", minMentions: 3, limit: 10, offset: 0 });
+  const pct = (s: number) => `${s > 0 ? "+" : ""}${Math.round(s * 100)}`;
 
   return (
     <main>
@@ -55,6 +60,40 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </tbody>
           </table>
         )
+      )}
+
+      <h2>Deine Umfragen (dieser Monat)</h2>
+      {myPolls.items.length === 0 ? <p>Noch keine Umfragen erfasst.</p> : myPolls.items.map((p, i) => (
+        <details key={p.pollId} style={{ marginBottom: 12 }}>
+          <summary><strong>{p.question}</strong>: {p.totalVotes} Stimmen, {fmt(p.startedAt)}</summary>
+          <ul>{p.options.map((o) => <li key={o.id}>{o.text}: {o.votes} ({o.percent} %)</li>)}</ul>
+          {pollVoters[i]?.voters?.length ? (
+            <p style={{ fontSize: 14 }}>Abgestimmt haben (nur für dich sichtbar):{" "}
+              {pollVoters[i]!.voters!.slice(0, 50).map((v) => `@${v.user} → ${p.options.find((o) => o.id === v.optionId)?.text}`).join(", ")}
+              {pollVoters[i]!.voters!.length > 50 && " …"}
+            </p>
+          ) : <p style={{ fontSize: 14, color: "#666" }}>Namen werden nur erfasst, solange dein Schlüssel aktiv ist.</p>}
+        </details>
+      ))}
+
+      <h2>Wo über dich gesprochen wurde (dieser Monat)</h2>
+      {refs.items.length === 0 ? <p>Keine anderen Streams gefunden, in denen du Thema warst.</p> : (
+        <>
+          <p>{refs.summary.references} Streams von {refs.summary.distinctStreamers} Creatorn, zusammen bis zu {refs.summary.summedPeakViewers.toLocaleString("de-DE")} Zuschauer gleichzeitig. Stimmung: {pct(refs.summary.sentiment)}</p>
+          <table cellPadding={6} style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
+            <thead><tr><th align="left">Wann</th><th align="left">Stream</th><th align="right">Erwähnungen</th><th align="right">Stimmung</th><th align="right">Zuschauer</th></tr></thead>
+            <tbody>{refs.items.map((r) => (
+              <tr key={r.roomId} style={{ borderTop: "1px solid #eee" }}>
+                <td style={{ whiteSpace: "nowrap" }}>{fmt(r.startedAt)}</td>
+                <td>@{r.streamer.uniqueId}{r.inTitle && " 🎬"}<br /><span style={{ color: "#666" }}>{r.title}</span></td>
+                <td align="right">{r.mentions}</td>
+                <td align="right">{pct(r.sentiment)}</td>
+                <td align="right">{r.peakViewers.toLocaleString("de-DE")}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+          <p style={{ fontSize: 13, color: "#666" }}>🎬 = du stehst im Stream-Titel (z. B. Reaction). Stimmung: −100 (negativ) bis +100 (positiv), grobe Schätzung aus dem Chat.</p>
+        </>
       )}
 
       <h2>API-Schlüssel</h2>

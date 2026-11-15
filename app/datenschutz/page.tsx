@@ -86,6 +86,16 @@ export default function Datenschutz() {
         über öffentliche LIVE-Aktivität bereitzustellen (Art. 6 Abs. 1 lit. f DSGVO). Du kannst jederzeit widersprechen
         (Abschnitt 11). Wir entfernen dann deine Daten aus den Ranglisten. [Speicherdauer festlegen.]</p>
 
+      <h2>9a. Stream-Analysen (Umfragen und Content-Tracking)</h2>
+      <p>Aus öffentlichen LIVE-Streams werten wir aus, wie viele Stimmen eine Umfrage pro Antwort erhalten hat, wie viele
+        Chatnachrichten pro Minute geschrieben wurden, wie die Stimmung im Chat war und wie oft andere Creator per @-Erwähnung
+        oder im Stream-Titel genannt wurden. Dafür werden Nachrichten und Stimmen beim Eingang automatisch ausgewertet. Gespeichert werden
+        nur <strong>Zählwerte ohne Namen der Zuschauer:innen</strong>, der Nachrichtentext wird verworfen. Rechtsgrundlage ist unser
+        berechtigtes Interesse an Statistiken über öffentliche LIVE-Aktivität (Art. 6 Abs. 1 lit. f DSGVO).</p>
+      <p><strong>Namentliche Umfrage-Stimmen</strong> speichern wir nur für Streams angemeldeter Creator mit aktivem Zugang, im Auftrag
+        dieses Creators (Art. 28 DSGVO, siehe Abschnitt 8). Nur dieser Creator kann sie sehen. Wir geben sie nicht an Dritte weiter
+        und bieten keine streamübergreifende Auswertung einzelner Personen an. Sie werden wie Chatnachrichten nach {CHAT_DAYS} Tagen gelöscht.</p>
+
       <h2>10. Empfänger</h2>
       <p>Empfänger sind unsere Hosting-Dienstleister (Abschnitt 3) sowie, für Chatdaten, ausschließlich der jeweilige Creator.
         Eine Weitergabe an Dritte erfolgt nur, wenn wir gesetzlich dazu verpflichtet sind.</p>

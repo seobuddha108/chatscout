@@ -34,6 +34,17 @@ const CHAT_LINES = [
   "@{creator} du bist die beste", "welche kamera ist das", "giveaway pls", "scam link: free-coins.example",
 ];
 
+// Lines for "reaction" streams, where another creator's (recorded) stream is played and discussed.
+const REACTION_LINES = [
+  "@{t} ist so cringe 😂", "@{t} hat voll recht", "@{t} lügner 🤡", "respekt an @{t} 👏", "@{t} fake",
+  "was hat @{t} da gemacht lol", "@{t} goat 🔥", "@{t} peinlich", "team @{t} ❤️", "@{t} ist unfair",
+];
+const POLLS: { q: string; o: string[] }[] = [
+  { q: "Nächstes Game?", o: ["Fortnite", "Minecraft", "Valorant"] },
+  { q: "Fake oder echt?", o: ["Fake", "Echt"] },
+  { q: "Bester Snack?", o: ["Chips", "Schoki", "Obst", "Nichts"] },
+];
+
 const ADJ = ["lucky", "wild", "cozy", "neon", "lazy", "crazy", "sunny", "pixel", "royal", "dark", "happy", "mighty"];
 const NOUN = ["fox", "tiger", "panda", "gamer", "queen", "chef", "wolf", "star", "dragon", "bear", "cat", "king"];
 
@@ -97,7 +108,10 @@ export class MockSource implements LiveSource {
     for (const s of ctx.openSessions) {
       const c = byId.get(s.creatorUniqueId);
       const popularity = c?.popularity ?? 1;
-      events.push(...this.sessionActivity(s.roomId, c, popularity, new Date(now.getTime() - 5 * 60_000), now));
+      const from = new Date(now.getTime() - 5 * 60_000);
+      const reactTo = s.title?.match(/@([\w.]+)/)?.[1];
+      events.push(...this.sessionActivity(s.roomId, c, popularity, from, now, 1, reactTo));
+      if (r() < 0.05) events.push(...this.makePoll(s.roomId, c, popularity, from, now, reactTo));
       if (r() < 0.1) events.push({ type: "live_end", roomId: s.roomId, at: now });
     }
 
@@ -125,7 +139,9 @@ export class MockSource implements LiveSource {
           const to = new Date(Math.min(from.getTime() + (0.5 + r() * 3.5) * 3_600_000, now.getTime() - 60_000));
           if (to <= from) continue;
           const start = this.start(c, from);
-          events.push(start, ...this.sessionActivity(start.roomId, c, c.popularity, from, to, (to.getTime() - from.getTime()) / 300_000));
+          const reactTo = start.title?.match(/@([\w.]+)/)?.[1];
+          events.push(start, ...this.sessionActivity(start.roomId, c, c.popularity, from, to, (to.getTime() - from.getTime()) / 300_000, reactTo));
+          if (r() < (reactTo ? 0.8 : 0.3)) events.push(...this.makePoll(start.roomId, c, c.popularity, from, to, reactTo));
           events.push({ type: "live_end", roomId: start.roomId, at: to });
         }
       }
@@ -135,17 +151,22 @@ export class MockSource implements LiveSource {
 
   private start(c: MockCreator, at: Date): Extract<LiveEvent, { type: "live_start" }> {
     const { popularity: _p, ...creator } = c;
+    const r = this.rand;
+    // ~15% of non-gaming streams are reactions to another (preferably popular) creator.
+    let title = c.category === "gaming" ? "Ranked grind 🎮" : "Chatting with you ✨";
+    if (c.category === "general" && r() < 0.15) {
+      const candidates = this.creators.filter((x) => x.uniqueId !== c.uniqueId && x.popularity > 3);
+      if (candidates.length) title = `Reaktion auf @${pick(r, candidates).uniqueId} 👀`;
+    }
     return {
       type: "live_start",
       roomId: `mock-${at.getTime().toString(36)}-${(this.roomCounter++).toString(36)}-${c.uniqueId}`,
-      creator,
-      title: c.category === "gaming" ? "Ranked grind 🎮" : "Chatting with you ✨",
-      at,
+      creator, title, at,
     };
   }
 
   /** Gifts and viewer counts for one room over [from, to]; `intervals` = number of 5-min slices. */
-  private sessionActivity(roomId: string, c: MockCreator | undefined, popularity: number, from: Date, to: Date, intervals = 1): LiveEvent[] {
+  private sessionActivity(roomId: string, c: MockCreator | undefined, popularity: number, from: Date, to: Date, intervals = 1, reactTo?: string): LiveEvent[] {
     const r = this.rand;
     const out: LiveEvent[] = [];
     const span = to.getTime() - from.getTime();
@@ -167,10 +188,41 @@ export class MockSource implements LiveSource {
     for (let i = 0; i < chatCount; i++) {
       const n = Math.floor(r() * 5000);
       const fan = r() < 0.5 ? pool[Math.floor(Math.pow(r(), 2) * pool.length)] : { uniqueId: `viewer${n}`, nickname: `Viewer ${n}` };
-      const text = pick(r, CHAT_LINES).replace("{creator}", c?.uniqueId ?? "creator");
+      const text = reactTo && r() < 0.35
+        ? pick(r, REACTION_LINES).replace("{t}", reactTo)
+        : pick(r, CHAT_LINES).replace("{creator}", c?.uniqueId ?? "creator");
       out.push({ type: "chat", roomId, user: { uniqueId: fan.uniqueId, nickname: fan.nickname }, text, at: new Date(from.getTime() + r() * span) });
     }
     out.push({ type: "viewers", roomId, viewers: Math.round(popularity * (20 + r() * 200)), at: to });
+    return out;
+  }
+
+  /** One poll inside [from, to] with skewed results; each voter votes once. */
+  private makePoll(roomId: string, c: MockCreator | undefined, popularity: number, from: Date, to: Date, reactTo?: string): LiveEvent[] {
+    const r = this.rand;
+    const def = reactTo ? { q: `War @${reactTo} im Recht?`, o: ["Ja", "Nein"] } : pick(r, POLLS);
+    const options = def.o.map((text, i) => ({ id: String(i + 1), text }));
+    const weights = options.map(() => 0.2 + r());
+    const total = weights.reduce((a, b) => a + b, 0);
+    const span = to.getTime() - from.getTime();
+    const start = new Date(from.getTime() + r() * span * 0.7);
+    const end = new Date(Math.min(start.getTime() + (2 + r() * 3) * 60_000, to.getTime()));
+    const pollId = `${roomId}-poll${(this.roomCounter++).toString(36)}`;
+    const out: LiveEvent[] = [{ type: "poll_start", roomId, pollId, question: def.q, options, at: start }];
+    const local = this.gifters.filter((g) => g.country === c?.country);
+    const voters = new Set<string>();
+    const n = Math.round(popularity * (10 + r() * 40));
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor(r() * 5000);
+      const u = r() < 0.4 && local.length ? local[Math.floor(r() * local.length)] : { uniqueId: `viewer${k}`, nickname: `Viewer ${k}` };
+      if (voters.has(u.uniqueId)) continue;
+      voters.add(u.uniqueId);
+      let x = r() * total, idx = 0;
+      while ((x -= weights[idx]) > 0 && idx < options.length - 1) idx++;
+      out.push({ type: "poll_vote", roomId, pollId, optionId: options[idx].id, user: { uniqueId: u.uniqueId, nickname: u.nickname },
+        at: new Date(start.getTime() + r() * (end.getTime() - start.getTime())) });
+    }
+    out.push({ type: "poll_end", roomId, pollId, at: end });
     return out;
   }
 }

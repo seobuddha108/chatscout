@@ -12,7 +12,8 @@ const now = new Date();
 
 // Opt in the first creator so their chat gets stored (others' chat is dropped).
 // Verified with the same fake open_id the local dev login uses, so you can log in as them.
-const demo = source.creators[0].uniqueId;
+// The most popular German creator, so the demo also shows reaction streams about them.
+const demo = [...source.creators].filter((c) => c.country === "DE").sort((a, b) => b.popularity - a.popularity)[0].uniqueId;
 const { key } = await createApiKey(db, { name: "demo creator", plan: "pro", creator: demo });
 await linkTikTokAccount(db, { openId: `dev:${demo}`, username: demo, displayName: demo, avatarUrl: null });
 console.log(`Demo creator @${demo} (dev login), API key: ${key}`);

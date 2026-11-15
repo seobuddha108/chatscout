@@ -3,6 +3,7 @@ import type { DB } from "@/db";
 import { creators, giftEvents, gifters, liveSessions } from "@/db/schema";
 import { leagueFor, leagueRange, type League } from "./leagues";
 import { periodWindow, type Period } from "./periods";
+import { allRows } from "@/db/rows";
 
 export interface RankingParams {
   period: Period;
@@ -146,8 +147,4 @@ export async function countryOverview(db: DB, period: Period, at = new Date()) {
   };
 }
 
-// db.execute returns an array (postgres-js) or { rows } (PGlite).
-function allRows<T>(res: unknown): T[] {
-  return (Array.isArray(res) ? res : (res as { rows: T[] }).rows) as T[];
-}
 function firstRow<T>(res: unknown): T | undefined { return allRows<T>(res)[0]; }

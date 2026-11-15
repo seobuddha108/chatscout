@@ -6,6 +6,16 @@ the regulars are, and reviewing moderation cases. It also offers LIVE rankings a
 gifter leaderboards. It currently runs on **mock data**. A real source is connected
 by implementing a single interface (see below).
 
+## Stream analytics
+
+- **Polls:** results per option and minute, from any public stream. Names of voters are stored only
+  for verified creators' own streams and are visible only to them (same retention and erasure as chat).
+- **Content tracking:** detects streams in which a creator was the topic, from a title mention
+  (e.g. "Reaktion auf @x") or at least `minMentions` @-mentions in chat. It reports reach (peak viewers),
+  diamonds, chat volume, and a rough sentiment score (DE/EN word list plus emoji, `src/analytics/text.ts`).
+- Only counts are stored (`session_minute_stats`, `session_mentions`, `poll_vote_buckets`). Message
+  texts from non-customer streams are never written. By design there is no cross-stream lookup of individual viewers.
+
 ## Privacy model
 
 - Chat is **only stored for creators with an active key** (`api_keys.creator_id`).
@@ -84,6 +94,10 @@ They were written without access to TikTok's docs, so check them against the cur
 | `GET /api/v1/chat/search` | `q` (all words must match, prefix match, `-word` excludes), `user`, `session` (roomId), `from`, `to`, `limit`, `offset` |
 | `GET /api/v1/chat/chatters` | `period`, `date`, `prefix`, `limit`, `offset`: most active chatters |
 | `DELETE /api/v1/chat/chatters/:user` | erases that chatter's messages |
+| `GET /api/v1/polls` | `creator`, `country`, `q` (question text), `period`, `date`, `limit`, `offset`: aggregated results |
+| `GET /api/v1/polls/:pollId` | results + per-minute timeline; voter names only for the stream owner's own polls |
+| `GET /api/v1/content/references` | `about` (creator talked about) and/or `by` (streamer), `minMentions` (default 3), `period`, `date` |
+| `GET /api/v1/sessions/:roomId/timeline` | chat volume, sentiment and diamonds per minute, peaks, mentioned creators, polls |
 | `GET /api/v1/rankings/creators` | `country`, `period` (day/week/month), `date` (YYYY-MM-DD), `category` (general/gaming), `league` (S–D), `limit`, `offset` |
 | `GET /api/v1/rankings/gifters` | `country`, `period`, `date`, `creator`, `limit`, `offset` |
 | `GET /api/v1/creators/:uniqueId` | `date` |

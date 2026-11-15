@@ -1,12 +1,13 @@
 import { and, eq, gt, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { DB } from "@/db";
-import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions, webSessions } from "@/db/schema";
+import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions, pollVoters, webSessions } from "@/db/schema";
 import type { CreatorInfo, GifterInfo, LiveEvent, LiveSource } from "./types";
 import { MockSource } from "./mock-source";
+import { ingestAnalytics, type AnalyticsResult } from "@/analytics/ingest";
 
 const CHUNK = 1000;
 
-export interface IngestResult {
+export interface IngestResult extends AnalyticsResult {
   sessionsStarted: number;
   sessionsEnded: number;
   gifts: number;
@@ -68,6 +69,7 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   // 3. Resolve every room referenced in this batch.
   const roomIds = [...new Set([
     ...starts.keys(), ...ends.keys(), ...peak.keys(), ...gifts.map((g) => g.roomId), ...chats.map((c) => c.roomId),
+    ...events.filter((e) => e.type.startsWith("poll_")).map((e) => e.roomId),
   ])];
   const rooms = new Map<string, { id: number; creatorId: number }>();
   for (const batch of chunks(roomIds)) {
@@ -92,8 +94,10 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   // 4b. Chat — only for creators who opted in. Everyone else's chat is never written.
   let chatsDropped = 0;
   const chatRows = [];
+  let optedInCache: Promise<Set<number>> | undefined;
+  const getOptedIn = () => (optedInCache ??= optedInCreatorIds(db));
   if (chats.length) {
-    const optedIn = await optedInCreatorIds(db);
+    const optedIn = await getOptedIn();
     for (const c of chats) {
       const room = rooms.get(c.roomId);
       if (!room) { skipped++; continue; }
@@ -105,6 +109,9 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     }
     for (const batch of chunks(chatRows)) await db.insert(chatMessages).values(batch);
   }
+
+  // 4c. Aggregate analytics (chat volume/sentiment, mentions, polls).
+  const analytics = await ingestAnalytics(db, events, rooms, getOptedIn);
 
   // 5. Peak viewers and session ends, one UPDATE ... FROM (VALUES ...) per chunk.
   const peakRows = [...peak].filter(([room]) => rooms.has(room));
@@ -125,7 +132,7 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
     sessionsEnded += rowCount(res);
   }
 
-  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, skipped };
+  return { sessionsStarted, sessionsEnded, gifts: giftRows.length, chats: chatRows.length, chatsDropped, skipped, ...analytics };
 }
 
 /** Creators verified via TikTok Login that also hold an active (not revoked, not expired) key. */
@@ -146,13 +153,16 @@ export async function purgeExpiredSessions(db: DB, now = new Date()) {
 export async function purgeOldChat(db: DB, days = Number(process.env.CHAT_RETENTION_DAYS ?? 30), now = new Date()) {
   const cutoff = new Date(now.getTime() - days * 86_400_000);
   const rows = await db.delete(chatMessages).where(lt(chatMessages.createdAt, cutoff)).returning({ id: chatMessages.id });
-  return rows.length;
+  // Named poll votes follow the same retention as chat.
+  const votes = await db.delete(pollVoters).where(lt(pollVoters.votedAt, cutoff)).returning({ id: pollVoters.pollId });
+  return rows.length + votes.length;
 }
 
 /** One pipeline run: ask the source for new events given what is live, then store them. */
 export async function runIngest(db: DB, source: LiveSource, now = new Date()) {
   const open = await db.select({
     roomId: liveSessions.externalRoomId, creatorUniqueId: creators.uniqueId, startedAt: liveSessions.startedAt,
+    title: liveSessions.title,
   }).from(liveSessions).innerJoin(creators, eq(creators.id, liveSessions.creatorId))
     .where(isNull(liveSessions.endedAt));
   const events = await source.poll({ now, openSessions: open });

@@ -23,12 +23,16 @@ export type LiveEvent =
   | { type: "viewers"; roomId: string; viewers: number; at: Date }
   | { type: "gift"; roomId: string; gifter: GifterInfo; giftName: string; diamonds: number; at: Date }
   | { type: "chat"; roomId: string; user: { uniqueId: string; nickname: string }; text: string; at: Date }
+  | { type: "poll_start"; roomId: string; pollId: string; question: string; options: { id: string; text: string }[]; at: Date }
+  | { type: "poll_vote"; roomId: string; pollId: string; optionId: string; user: { uniqueId: string; nickname: string }; at: Date }
+  | { type: "poll_end"; roomId: string; pollId: string; at: Date }
   | { type: "live_end"; roomId: string; at: Date };
 
 export interface OpenSession {
   roomId: string;
   creatorUniqueId: string;
   startedAt: Date;
+  title?: string | null;
 }
 
 export interface PollContext {

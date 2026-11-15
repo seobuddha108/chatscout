@@ -34,7 +34,8 @@ export function apiRoute<S extends z.ZodType, P = unknown>(
 
       const parsed = schema.safeParse(Object.fromEntries(new URL(req.url).searchParams));
       if (!parsed.success) {
-        return json({ error: "Invalid query parameters.", issues: z.flattenError(parsed.error).fieldErrors }, 400, rate);
+        const { formErrors, fieldErrors } = z.flattenError(parsed.error);
+        return json({ error: formErrors[0] ?? "Invalid query parameters.", issues: fieldErrors }, 400, rate);
       }
       const maxLimit = PLANS[auth.plan].maxLimit;
       const params = (await routeCtx?.params) as P;

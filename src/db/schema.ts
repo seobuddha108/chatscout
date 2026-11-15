@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-  bigserial, customType, date, index, integer, pgTable, primaryKey, serial, text, timestamp, uniqueIndex,
+  bigserial, boolean, customType, date, index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
@@ -101,3 +101,62 @@ export const webSessions = pgTable("web_sessions", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("web_sessions_token_idx").on(t.tokenHash)]);
+
+// ---------------------------------------------------------------------------
+// Analytics. Everything below is aggregated and contains no viewer identities,
+// except poll_voters, which is only written for verified creators' own streams.
+
+export const polls = pgTable("polls", {
+  id: serial("id").primaryKey(),
+  externalPollId: text("external_poll_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => liveSessions.id),
+  creatorId: integer("creator_id").notNull().references(() => creators.id),
+  question: text("question").notNull(),
+  options: jsonb("options").$type<{ id: string; text: string }[]>().notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("polls_external_idx").on(t.externalPollId),
+  index("polls_creator_idx").on(t.creatorId, t.startedAt),
+]);
+
+/** Vote counts per option and minute (no voter identities). */
+export const pollVoteBuckets = pgTable("poll_vote_buckets", {
+  pollId: integer("poll_id").notNull().references(() => polls.id),
+  optionId: text("option_id").notNull(),
+  minute: timestamp("minute", { withTimezone: true }).notNull(),
+  votes: integer("votes").notNull(),
+}, (t) => [primaryKey({ columns: [t.pollId, t.optionId, t.minute] })]);
+
+/** Named votes: only for polls in the stream of a verified creator with an active key, visible only to them. */
+export const pollVoters = pgTable("poll_voters", {
+  pollId: integer("poll_id").notNull().references(() => polls.id),
+  voterUniqueId: text("voter_unique_id").notNull(),
+  voterNickname: text("voter_nickname").notNull(),
+  optionId: text("option_id").notNull(),
+  votedAt: timestamp("voted_at", { withTimezone: true }).notNull(),
+}, (t) => [primaryKey({ columns: [t.pollId, t.voterUniqueId] })]);
+
+/** Chat volume and sentiment per session and minute. */
+export const sessionMinuteStats = pgTable("session_minute_stats", {
+  sessionId: integer("session_id").notNull().references(() => liveSessions.id),
+  minute: timestamp("minute", { withTimezone: true }).notNull(),
+  messages: integer("messages").notNull(),
+  positive: integer("positive").notNull(),
+  negative: integer("negative").notNull(),
+}, (t) => [primaryKey({ columns: [t.sessionId, t.minute] })]);
+
+/** How often another creator was @-mentioned in a session's chat or title. Basis for content tracking. */
+export const sessionMentions = pgTable("session_mentions", {
+  sessionId: integer("session_id").notNull().references(() => liveSessions.id),
+  mentionedCreatorId: integer("mentioned_creator_id").notNull().references(() => creators.id),
+  mentions: integer("mentions").notNull(),
+  positive: integer("positive").notNull(),
+  negative: integer("negative").notNull(),
+  inTitle: boolean("in_title").notNull().default(false),
+  firstAt: timestamp("first_at", { withTimezone: true }).notNull(),
+  lastAt: timestamp("last_at", { withTimezone: true }).notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.sessionId, t.mentionedCreatorId] }),
+  index("session_mentions_mentioned_idx").on(t.mentionedCreatorId),
+]);
