@@ -21,11 +21,12 @@ export default function Privacy() {
       </p>
 
       <h2>2. Overview</h2>
-      <p>{L.productName} helps creators search the chat of their <strong>own</strong> TikTok LIVE streams and provides
-        rankings about LIVE streams. Three groups of people are affected:</p>
+      <p>{L.productName} helps creators search the chat of their <strong>own</strong> TikTok LIVE streams, records the LIVE
+        streams of creators that users follow, and provides statistics about LIVE streams. These groups of people are affected:</p>
       <ul>
         <li><strong>Creators</strong> who sign in to {L.productName} (sections 4–7),</li>
         <li><strong>Viewers</strong> who write in the LIVE chat of a signed-in creator (section 8),</li>
+        <li><strong>Creators followed by users, and their viewers</strong> (section 8a),</li>
         <li><strong>Creators and supporters</strong> who appear in public LIVE rankings (section 9).</li>
       </ul>
       <p>We do not use any advertising, analytics or tracking tools and we do not sell data.</p>
@@ -69,7 +70,7 @@ export default function Privacy() {
         The data comes from the public LIVE chat (Art. 14 GDPR).</p>
       <p><strong>Only for signed-in creators:</strong> chat messages are only stored from streams of creators who have verified
         their TikTok account with us and have active access. Only that creator can search them. We do not store chats from other
-        streams. There is no search for people across streams.</p>
+        streams. Section 8a applies to other creators' streams. There is no search for people across streams.</p>
       <p><strong>Purpose and role:</strong> the search serves the creator&apos;s moderation and community management, for example to
         find giveaway entries, spam or insults. We process the data on behalf of the creator (Art. 28 GDPR). The creator is the
         controller and relies on their legitimate interest in moderating their stream (Art. 6(1)(f) GDPR).</p>
@@ -79,10 +80,26 @@ export default function Privacy() {
         with the creator directly or with us at {mail} (please state your TikTok username and the stream). We forward requests to
         the creator or delete the messages on their behalf.</p>
 
+      <h2>8a. Recording of followed creators</h2>
+      <p><strong>What:</strong> Users with an active package can follow public TikTok creators. We then record their LIVE streams:
+        title, times, viewer numbers, gifts, poll results, chat activity and chat messages.</p>
+      <p><strong>Pseudonymization:</strong> For chat messages, gifts and poll votes in these streams we store <strong>no viewer
+        usernames</strong>, only a pseudonym (e.g. &quot;Zuschauer #a3f9&quot;). It is derived per stream with a secret key. Within one
+        stream you can tell that the same person wrote several times, but not across streams. Message texts are stored and can be
+        searched by the users following that creator.</p>
+      <p><strong>Legal basis and role:</strong> We are the controller for these recordings. We rely on our and our users&apos;
+        legitimate interest in analyzing public LIVE streams, e.g. for content analysis and reaction formats (Art. 6(1)(f) GDPR).
+        Pseudonymization and short retention periods protect viewers.</p>
+      <p><strong>Retention:</strong> chat messages {CHAT_DAYS} days, individual gift events {GIFT_DAYS} days, then automatic deletion.</p>
+      <p><strong>Objection for creators:</strong> Creators can stop others from recording their streams at any time, in the dashboard
+        under &quot;Einstellungen&quot; (settings) after signing in, or by email to {mail}. Existing follows and pseudonymous chat recordings are then deleted.</p>
+      <p><strong>Objection for viewers:</strong> Send us your TikTok username and the stream ({mail}). We can compute your pseudonym
+        for that stream and delete the related data.</p>
+
       <h2>9. Public LIVE rankings</h2>
       <p>For rankings we process publicly visible information about LIVE streams: username, display name, country and category of
-        creators, times and viewer numbers of streams, and the totals of virtual gifts, including the username and display name of
-        the people sending gifts. The legal basis is our legitimate interest in providing statistics about public LIVE activity
+        creators, times and viewer numbers of streams, and the totals of virtual gifts. Names of people sending gifts are only stored
+        in a signed-in creator&apos;s own streams, otherwise pseudonymously (section 8a). The legal basis is our legitimate interest in providing statistics about public LIVE activity
         (Art. 6(1)(f) GDPR). You can object at any time (section 11), and we will then remove your data from the rankings.
         Individual gift events, including the names of the people sending gifts, are deleted automatically after {GIFT_DAYS} days.</p>
 

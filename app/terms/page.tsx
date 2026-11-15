@@ -21,7 +21,9 @@ export default function Terms() {
       <h2>2. Services</h2>
       <ol>
         <li>{P} stores the chat messages of a verified creator&apos;s own TikTok LIVE streams and makes them searchable for that
-          creator (by keywords, people and time ranges). {P} also offers rankings about LIVE streams via an API.</li>
+          creator (by keywords, people and time ranges). {P} also records the LIVE streams of creators that users
+          follow (timeline, polls, chat with pseudonyms instead of viewer names) and offers statistics via an API. The number of
+          creators one can follow depends on the package.</li>
         <li>The data comes from publicly accessible LIVE streams. The Provider has no influence on TikTok. It does not guarantee that
           the collected data is complete or that the service is available without interruption. Changes at TikTok may limit
           features.</li>
@@ -51,8 +53,8 @@ export default function Terms() {
 
       <h2>6. Users&apos; obligations</h2>
       <ol>
-        <li>{P} may only be used for moderation, community management and analysis of one&apos;s own stream. In particular, it is
-          prohibited to use data to harass, expose, stalk or reveal the identity of people (&quot;doxxing&quot;), and to pass on or
+        <li>{P} may only be used for moderation, community management and content analysis of LIVE streams. In particular, it is
+          prohibited to use data to harass, expose, stalk or reveal the identity of people (&quot;doxxing&quot;), to de-anonymize pseudonyms, and to pass on or
           publish third parties&apos; chat data without a legal basis.</li>
         <li>Creators inform their viewers in a suitable way (e.g. in their profile description or chat rules) that chat messages are
           stored for moderation. They handle viewers&apos; requests for access or deletion themselves or forward them to the Provider.

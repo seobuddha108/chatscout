@@ -3,6 +3,7 @@ import type { DB } from "@/db";
 import { apiKeys, chatMessages, creators, giftEvents, gifters, liveSessions, pollVoters, webSessions } from "@/db/schema";
 import type { CreatorInfo, GifterInfo, LiveEvent, LiveSource } from "./types";
 import { MockSource } from "./mock-source";
+import { pseudonym, recordingModes } from "@/live/policy";
 import { ingestAnalytics, type AnalyticsResult } from "@/analytics/ingest";
 
 const CHUNK = 1000;
@@ -12,7 +13,7 @@ export interface IngestResult extends AnalyticsResult {
   sessionsEnded: number;
   gifts: number;
   chats: number;
-  chatsDropped: number; // chat from creators without an active ChatScout key (not stored)
+  chatsDropped: number; // chat from streams that are neither the account's own nor followed (not stored)
   duplicates: number; // chat/gift events already stored (same TikTok message id)
   skipped: number; // events for rooms we have never seen a live_start for
 }
@@ -25,14 +26,13 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   let gifts: Extract<LiveEvent, { type: "gift" }>[] = [];
   let chats: Extract<LiveEvent, { type: "chat" }>[] = [];
   const creatorInfo = new Map<string, CreatorInfo>();
-  const gifterInfo = new Map<string, GifterInfo>();
 
   for (const e of events) {
     switch (e.type) {
       case "live_start": starts.set(e.roomId, e); creatorInfo.set(e.creator.uniqueId, e.creator); break;
       case "live_end": ends.set(e.roomId, e.at); break;
       case "viewers": peak.set(e.roomId, Math.max(peak.get(e.roomId) ?? 0, e.viewers)); break;
-      case "gift": gifts.push(e); gifterInfo.set(e.gifter.uniqueId, e.gifter); break;
+      case "gift": gifts.push(e); break;
       case "chat": chats.push(e); break;
     }
   }
@@ -48,14 +48,6 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
       },
     }).returning({ id: creators.id, uniqueId: creators.uniqueId });
     for (const r of rows) creatorIds.set(r.uniqueId, r.id);
-  }
-  const gifterIds = new Map<string, number>();
-  for (const batch of chunks([...gifterInfo.values()])) {
-    const rows = await db.insert(gifters).values(batch).onConflictDoUpdate({
-      target: gifters.uniqueId,
-      set: { nickname: sql`excluded.nickname`, country: sql`coalesce(excluded.country, ${gifters.country})` },
-    }).returning({ id: gifters.id, uniqueId: gifters.uniqueId });
-    for (const r of rows) gifterIds.set(r.uniqueId, r.id);
   }
 
   // 2. Insert new sessions.
@@ -94,33 +86,55 @@ export async function ingestEvents(db: DB, events: LiveEvent[]): Promise<IngestR
   chats = freshEvents.filter((e): e is typeof chats[number] => e.type === "chat");
   gifts = freshEvents.filter((e): e is typeof gifts[number] => e.type === "gift");
 
-  // 4. Gifts.
+  // 4. Gifts. Gifter names are kept only for the creator's own streams; elsewhere they become
+  // per-stream pseudonyms, so supporters can't be followed across streams.
   let skipped = 0;
-  const giftRows = [];
-  for (const g of gifts) {
+  const involved = [...new Set([...gifts, ...chats].map((e) => rooms.get(e.roomId)?.creatorId).filter((x): x is number => x !== undefined))];
+  const modes = await recordingModes(db, involved);
+  const gifterOf = (g: typeof gifts[number], room: { id: number; creatorId: number }): GifterInfo => {
+    if (modes.get(room.creatorId) === "named") return g.gifter;
+    const p = pseudonym(room.id, g.gifter.uniqueId);
+    return { uniqueId: `anon-${p}`, nickname: `Unterstützer #${p.slice(0, 4)}` };
+  };
+  const giftsWithRoom = gifts.flatMap((g) => {
     const room = rooms.get(g.roomId);
-    if (!room) { skipped++; continue; }
+    if (!room) { skipped++; return []; }
+    return [{ g, room, gifter: gifterOf(g, room) }];
+  });
+  const gifterIds = new Map<string, number>();
+  for (const batch of chunks([...new Map(giftsWithRoom.map((x) => [x.gifter.uniqueId, x.gifter])).values()])) {
+    const rows = await db.insert(gifters).values(batch).onConflictDoUpdate({
+      target: gifters.uniqueId,
+      set: { nickname: sql`excluded.nickname`, country: sql`coalesce(excluded.country, ${gifters.country})` },
+    }).returning({ id: gifters.id, uniqueId: gifters.uniqueId });
+    for (const r of rows) gifterIds.set(r.uniqueId, r.id);
+  }
+  const giftRows = [];
+  for (const { g, room, gifter } of giftsWithRoom) {
     giftRows.push({
-      sessionId: room.id, creatorId: room.creatorId, gifterId: gifterIds.get(g.gifter.uniqueId)!,
+      sessionId: room.id, creatorId: room.creatorId, gifterId: gifterIds.get(gifter.uniqueId)!,
       giftName: g.giftName, diamonds: g.diamonds, createdAt: g.at, externalMsgId: g.msgId ?? null,
     });
   }
   for (const batch of chunks(giftRows)) await db.insert(giftEvents).values(batch).onConflictDoNothing();
 
-  // 4b. Chat — only for creators who opted in. Everyone else's chat is never written.
+  // 4b. Chat: own streams with names, followed streams with per-stream pseudonyms, others not at all.
   let chatsDropped = 0;
   const chatRows = [];
   let optedInCache: Promise<Set<number>> | undefined;
   const getOptedIn = () => (optedInCache ??= optedInCreatorIds(db));
   if (chats.length) {
-    const optedIn = await getOptedIn();
     for (const c of chats) {
       const room = rooms.get(c.roomId);
       if (!room) { skipped++; continue; }
-      if (!optedIn.has(room.creatorId)) { chatsDropped++; continue; }
+      const mode = modes.get(room.creatorId);
+      if (!mode) { chatsDropped++; continue; }
+      const p = mode === "pseudonymous" ? pseudonym(room.id, c.user.uniqueId) : null;
       chatRows.push({
-        sessionId: room.id, creatorId: room.creatorId, chatterUniqueId: c.user.uniqueId.toLowerCase(),
-        chatterNickname: c.user.nickname, text: c.text.slice(0, 500), createdAt: c.at, externalMsgId: c.msgId ?? null,
+        sessionId: room.id, creatorId: room.creatorId,
+        chatterUniqueId: p ? `anon-${p}` : c.user.uniqueId.toLowerCase(),
+        chatterNickname: p ? `Zuschauer #${p.slice(0, 4)}` : c.user.nickname,
+        text: c.text.slice(0, 500), createdAt: c.at, externalMsgId: c.msgId ?? null,
       });
     }
     for (const batch of chunks(chatRows)) await db.insert(chatMessages).values(batch).onConflictDoNothing();

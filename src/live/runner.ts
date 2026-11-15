@@ -21,7 +21,8 @@ export interface RunOptions {
 /**
  * One cron tick: lease every opted-in creator that nobody is (or soon will stop) watching,
  * connect to those that are live and stream their events into the database until the window ends.
- * Only verified creators with an active key are ever watched (same rule as chat storage).
+ * Watched: the own streams of verified creators with an active package, and creators followed by
+ * an account with an active package (unless they opted out). See src/live/policy.ts for what is stored.
  */
 export async function runLiveWindow(db: DB, o: RunOptions = {}) {
   const now = o.now ?? new Date();
@@ -37,9 +38,15 @@ export async function runLiveWindow(db: DB, o: RunOptions = {}) {
   const leased = allRows<{ id: number; unique_id: string; nickname: string; country: string | null; category: string }>(await db.execute(sql`
     with candidates as (
       select c.id from creators c
-      join api_keys k on k.creator_id = c.id and k.revoked_at is null and k.expires_at > ${now.toISOString()}::timestamptz
       left join live_watch w on w.creator_id = c.id
-      where c.verified_at is not null
+      where (
+          -- own streams: verified creator with an active package
+          (c.verified_at is not null and exists (select 1 from api_keys k where k.creator_id = c.id
+            and k.revoked_at is null and k.expires_at > ${now.toISOString()}::timestamptz))
+          -- followed streams: followed by an account with an active package, unless opted out
+          or (not c.no_tracking and exists (select 1 from follows f join api_keys k on k.creator_id = f.follower_id
+            and k.revoked_at is null and k.expires_at > ${now.toISOString()}::timestamptz where f.creator_id = c.id))
+        )
         and (w.creator_id is null
           or (w.lease_until is not null and w.lease_until < ${takeoverBefore.toISOString()}::timestamptz)
           or (w.lease_until is null and (w.last_checked_at is null or w.last_checked_at < ${recheckAfter.toISOString()}::timestamptz)))

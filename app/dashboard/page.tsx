@@ -6,8 +6,11 @@ import { currentCreator } from "@/auth/current";
 import { optedInCreatorIds } from "@/ingest/ingest";
 import { searchChat } from "@/chat/queries";
 import { contentReferences, listPolls, pollDetail } from "@/analytics/queries";
-import { revokeKey } from "./actions";
+import { noTrackingAction, revokeKey, unfollowAction } from "./actions";
 import { CreateKey } from "./create-key";
+import { FollowForm } from "./follow-form";
+import { listFollows } from "@/follow/follows";
+import { creators } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const collecting = (await optedInCreatorIds(db)).has(creator.id);
   const results = q || user ? await searchChat(db, { creatorId: creator.id, q, user, limit: 50, offset: 0 }) : null;
   const now = new Date();
+  const followed = await listFollows(db, creator.id);
+  const [me] = await db.select({ noTracking: creators.noTracking }).from(creators).where(eq(creators.id, creator.id));
   const myPolls = await listPolls(db, { creator: creator.uniqueId, period: "month", limit: 5, offset: 0 });
   const pollVoters = await Promise.all(myPolls.items.map((p) => pollDetail(db, p.pollId, creator.id)));
   const refs = await contentReferences(db, { about: creator.uniqueId, period: "month", minMentions: 3, limit: 10, offset: 0 });
@@ -39,7 +44,22 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         Chat-Erfassung: {collecting ? "🟢 aktiv" : "⚪ inaktiv. Erstelle einen Schlüssel, damit dein Chat gespeichert wird."}
       </p>
 
-      <h2>Chat durchsuchen</h2>
+      <h2>Verfolgte Creator</h2>
+      <p style={{ fontSize: 14, color: "#555" }}>Streams dieser Creator werden automatisch aufgezeichnet: Chat (mit Pseudonymen statt Namen), Geschenke, Zuschauer und Umfragen.</p>
+      <FollowForm />
+      {followed.length > 0 && (
+        <table cellPadding={6} style={{ borderCollapse: "collapse", width: "100%", marginTop: 12, fontSize: 14 }}>
+          <tbody>{followed.map((f) => (
+            <tr key={f.creatorId} style={{ borderTop: "1px solid #eee" }}>
+              <td><a href={`/dashboard/c/${encodeURIComponent(f.uniqueId)}`}>@{f.uniqueId}</a>{f.isLive && <strong style={{ color: "#d93025" }}> ● LIVE</strong>}</td>
+              <td style={{ color: "#666" }}>{f.sessions} Streams{f.lastStartedAt && <>, zuletzt {fmt(f.lastStartedAt)}</>}</td>
+              <td align="right"><form action={unfollowAction}><input type="hidden" name="creatorId" value={f.creatorId} /><button>Entfernen</button></form></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+
+      <h2>Chat deiner eigenen Streams durchsuchen</h2>
       <form method="get" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input name="q" defaultValue={q} placeholder="Begriffe, z. B. giveaway -scam" style={{ flex: "1 1 220px" }} />
         <input name="user" defaultValue={user} placeholder="@nutzer" style={{ flex: "0 1 160px" }} />
@@ -95,6 +115,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <p style={{ fontSize: 13, color: "#666" }}>🎬 = du stehst im Stream-Titel (z. B. Reaction). Stimmung: −100 (negativ) bis +100 (positiv), grobe Schätzung aus dem Chat.</p>
         </>
       )}
+
+      <h2>Einstellungen</h2>
+      <form action={noTrackingAction} style={{ fontSize: 14 }}>
+        <label><input type="checkbox" name="noTracking" defaultChecked={me?.noTracking} /> Andere dürfen meine Streams nicht aufzeichnen</label>{" "}
+        <button>Speichern</button>
+      </form>
 
       <h2>API-Schlüssel</h2>
       <CreateKey />

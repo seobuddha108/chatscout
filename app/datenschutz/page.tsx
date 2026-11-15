@@ -21,11 +21,12 @@ export default function Datenschutz() {
       {L.dataProtectionOfficer && <p>Datenschutzbeauftragte:r: {L.dataProtectionOfficer}</p>}
 
       <h2>2. Überblick</h2>
-      <p>{L.productName} hilft Creatorn, den Chat ihrer <strong>eigenen</strong> TikTok-LIVE-Streams zu durchsuchen,
-        und stellt Ranglisten zu LIVE-Streams bereit. Dabei sind drei Gruppen betroffen:</p>
+      <p>{L.productName} hilft Creatorn, den Chat ihrer <strong>eigenen</strong> TikTok-LIVE-Streams zu durchsuchen, zeichnet
+        LIVE-Streams von Creatorn auf, denen Nutzer:innen folgen, und stellt Statistiken zu LIVE-Streams bereit. Dabei sind diese Gruppen betroffen:</p>
       <ul>
         <li><strong>Creator</strong>, die sich bei {L.productName} anmelden (Abschnitte 4–7),</li>
         <li><strong>Zuschauer:innen</strong>, die im LIVE-Chat eines angemeldeten Creators schreiben (Abschnitt 8),</li>
+        <li><strong>Creator, denen Nutzer:innen folgen, und deren Zuschauer:innen</strong> (Abschnitt 8a),</li>
         <li><strong>Creator und Unterstützer:innen</strong>, die in öffentlichen LIVE-Ranglisten erscheinen (Abschnitt 9).</li>
       </ul>
       <p>Wir setzen keine Werbe-, Analyse- oder Tracking-Tools ein und verkaufen keine Daten.</p>
@@ -71,7 +72,7 @@ export default function Datenschutz() {
         und der zugehörige Stream. Die Daten stammen aus dem öffentlichen LIVE-Chat (Art. 14 DSGVO).</p>
       <p><strong>Nur für angemeldete Creator:</strong> Chatnachrichten werden nur aus Streams von Creatorn gespeichert, die ihr
         TikTok-Konto bei uns verifiziert haben und einen aktiven Zugang besitzen. Nur der jeweilige Creator kann sie durchsuchen.
-        Chats aus anderen Streams speichern wir nicht. Es gibt keine streamübergreifende Suche nach Personen.</p>
+        Für Streams anderer Creator gilt Abschnitt 8a. Es gibt keine streamübergreifende Suche nach Personen.</p>
       <p><strong>Zweck und Rolle:</strong> Die Suche dient der Moderation und dem Community-Management des Creators, etwa um
         Gewinnspiel-Teilnahmen, Spam oder Beleidigungen zu finden. Hierbei verarbeiten wir die Daten im Auftrag des Creators
         (Art. 28 DSGVO). Der Creator ist Verantwortlicher und stützt sich auf sein berechtigtes Interesse an der Moderation
@@ -82,10 +83,27 @@ export default function Datenschutz() {
         verlangen, direkt beim Creator oder bei uns unter {mail} (bitte TikTok-Benutzernamen und Stream angeben). Wir leiten
         Anfragen an den Creator weiter bzw. löschen die Nachrichten in seinem Auftrag.</p>
 
+      <h2>8a. Aufzeichnung verfolgter Creator</h2>
+      <p><strong>Was:</strong> Nutzer:innen mit aktivem Paket können öffentlichen TikTok-Creatorn folgen. Deren LIVE-Streams zeichnen wir
+        dann auf: Titel, Zeitpunkte, Zuschauerzahlen, Geschenke, Umfrage-Ergebnisse, Chat-Aktivität und Chatnachrichten.</p>
+      <p><strong>Pseudonymisierung:</strong> Bei Chatnachrichten, Geschenken und Umfragestimmen in diesen Streams speichern wir
+        <strong>keine Benutzernamen</strong> der Zuschauer:innen, sondern ein Pseudonym (z. B. „Zuschauer #a3f9“). Es wird pro Stream
+        mit einem geheimen Schlüssel neu gebildet. Innerhalb eines Streams lässt sich erkennen, dass dieselbe Person mehrfach schreibt,
+        über verschiedene Streams hinweg jedoch nicht. Nachrichtentexte werden gespeichert und sind für die folgenden Nutzer:innen durchsuchbar.</p>
+      <p><strong>Rechtsgrundlage und Rolle:</strong> Für diese Aufzeichnungen sind wir Verantwortliche. Wir stützen uns auf unser
+        berechtigtes Interesse und das unserer Nutzer:innen an der Auswertung öffentlicher LIVE-Streams, etwa für Content-Analyse und
+        Reaktions-Formate (Art. 6 Abs. 1 lit. f DSGVO). Die Pseudonymisierung und kurze Speicherfristen dienen dem Schutz der Zuschauer:innen.</p>
+      <p><strong>Speicherdauer:</strong> Chatnachrichten {CHAT_DAYS} Tage, einzelne Geschenk-Ereignisse {GIFT_DAYS} Tage, danach automatische Löschung.</p>
+      <p><strong>Widerspruch für Creator:</strong> Creator können die Aufzeichnung ihrer Streams durch andere jederzeit beenden: nach
+        Anmeldung im Dashboard unter „Einstellungen“ oder per E-Mail an {mail}. Bestehende Verfolgungen und pseudonyme Chat-Aufzeichnungen
+        werden dann gelöscht.</p>
+      <p><strong>Widerspruch für Zuschauer:innen:</strong> Nenne uns deinen TikTok-Benutzernamen und den Stream ({mail}). Wir können
+        dein Pseudonym für diesen Stream berechnen und die zugehörigen Daten löschen.</p>
+
       <h2>9. Öffentliche LIVE-Ranglisten</h2>
       <p>Für Ranglisten verarbeiten wir öffentlich sichtbare Angaben zu LIVE-Streams: Benutzername, Anzeigename, Land und Kategorie
-        von Creatorn, Zeitpunkte und Zuschauerzahlen von Streams sowie die Summen virtueller Geschenke, einschließlich
-        Benutzername und Anzeigename der schenkenden Personen. Rechtsgrundlage ist unser berechtigtes Interesse, Statistiken
+        von Creatorn, Zeitpunkte und Zuschauerzahlen von Streams sowie die Summen virtueller Geschenke. Namen schenkender
+        Personen speichern wir nur in den eigenen Streams eines angemeldeten Creators, sonst pseudonym (Abschnitt 8a). Rechtsgrundlage ist unser berechtigtes Interesse, Statistiken
         über öffentliche LIVE-Aktivität bereitzustellen (Art. 6 Abs. 1 lit. f DSGVO). Du kannst jederzeit widersprechen
         (Abschnitt 11). Wir entfernen dann deine Daten aus den Ranglisten. Einzelne Geschenk-Ereignisse einschließlich der
         Namen der schenkenden Personen löschen wir automatisch nach {GIFT_DAYS} Tagen.</p>

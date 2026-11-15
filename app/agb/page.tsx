@@ -20,7 +20,9 @@ export default function Agb() {
       <h2>§ 2 Leistungen</h2>
       <ol>
         <li>{P} speichert die Chatnachrichten der eigenen TikTok-LIVE-Streams eines verifizierten Creators und macht sie für diesen
-          durchsuchbar (nach Begriffen, Personen und Zeiträumen). Außerdem bietet {P} Ranglisten zu LIVE-Streams über eine API.</li>
+          durchsuchbar (nach Begriffen, Personen und Zeiträumen). Außerdem zeichnet {P} LIVE-Streams von Creatorn auf,
+          denen Nutzer:innen folgen (Zeitleiste, Umfragen, Chat mit Pseudonymen statt Zuschauernamen), und bietet Statistiken über eine API.
+          Die Zahl verfolgbarer Creator hängt vom Paket ab.</li>
         <li>Die Daten stammen aus öffentlich zugänglichen LIVE-Streams. Der Anbieter hat keinen Einfluss auf TikTok. Er schuldet
           keine Vollständigkeit der erfassten Daten und keine ununterbrochene Verfügbarkeit. Änderungen bei TikTok können
           Funktionen einschränken.</li>
@@ -50,9 +52,9 @@ export default function Agb() {
 
       <h2>§ 6 Pflichten der Nutzer:innen</h2>
       <ol>
-        <li>{P} darf nur zur Moderation, zum Community-Management und zur Auswertung des eigenen Streams genutzt werden. Untersagt ist
+        <li>{P} darf nur zur Moderation, zum Community-Management und zur inhaltlichen Auswertung von LIVE-Streams genutzt werden. Untersagt ist
           insbesondere, Daten zu nutzen, um Personen zu belästigen, bloßzustellen, zu verfolgen oder ihre Identität offenzulegen
-          („Doxxing“), sowie die Weitergabe oder Veröffentlichung von Chatdaten Dritter ohne Rechtsgrundlage.</li>
+          („Doxxing“), Pseudonyme aufzulösen, sowie die Weitergabe oder Veröffentlichung von Chatdaten Dritter ohne Rechtsgrundlage.</li>
         <li>Creator informieren ihre Zuschauer:innen in geeigneter Weise (z. B. in der Profilbeschreibung oder in Chat-Regeln), dass
           Chatnachrichten zur Moderation gespeichert werden. Anfragen von Zuschauer:innen auf Auskunft oder Löschung bearbeiten sie
           selbst oder leiten sie an den Anbieter weiter. Im Dashboard bzw. über die API können Nachrichten einzelner Personen

@@ -15,6 +15,8 @@ export const creators = pgTable("creators", {
   // Set when the creator proved account ownership via TikTok Login. Stable across username changes.
   tiktokOpenId: text("tiktok_open_id"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  // Set by the verified creator: their streams must not be recorded by followers (opt-out).
+  noTracking: boolean("no_tracking").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("creators_unique_id_idx").on(t.uniqueId),
@@ -177,3 +179,13 @@ export const liveWatch = pgTable("live_watch", {
   lastLiveAt: timestamp("last_live_at", { withTimezone: true }),
   lastError: text("last_error"),
 });
+
+/** Accounts (verified creators) following other creators whose LIVE streams get recorded. */
+export const follows = pgTable("follows", {
+  followerId: integer("follower_id").notNull().references(() => creators.id),
+  creatorId: integer("creator_id").notNull().references(() => creators.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.followerId, t.creatorId] }),
+  index("follows_creator_idx").on(t.creatorId),
+]);

@@ -87,11 +87,22 @@ describe("rankings", () => {
     expect(d.items.map((i) => i.uniqueId)).toEqual(["anna", "ben"]);
   });
 
-  it("ranks gifters, optionally per creator", async () => {
-    const g = await gifterRanking(db, { period: "day", at: NOW, country: "DE", limit: 10, offset: 0 });
-    expect(g.items.map((i) => [i.uniqueId, i.diamonds, i.creatorsSupported])).toEqual([["f1", 1500, 2], ["f2", 1, 1]]);
-    const forBen = await gifterRanking(db, { period: "day", at: NOW, creator: "ben", limit: 10, offset: 0 });
-    expect(forBen.items.map((i) => i.uniqueId)).toEqual(["f1"]);
+  it("pseudonymizes gifters per stream, except in the creator's own streams", async () => {
+    // Not own streams: f1 gifted to anna and ben, but appears as two unrelated pseudonyms.
+    const g = await gifterRanking(db, { period: "day", at: NOW, country: undefined, limit: 10, offset: 0 });
+    expect(g.items.every((i) => i.uniqueId.startsWith("anon-"))).toBe(true);
+    expect(g.items.map((i) => [i.diamonds, i.creatorsSupported])).toEqual([[29999, 1], [1000, 1], [500, 1], [1, 1]]);
+    // Own stream (verified + active key): names are kept.
+    const { createApiKey } = await import("@/api/keys");
+    const { linkTikTokAccount } = await import("@/auth/link");
+    await createApiKey(db, { name: "d", plan: "pro", creator: "dora" });
+    await linkTikTokAccount(db, { openId: "o-dora", username: "dora", displayName: "Dora", avatarUrl: null });
+    await ingestEvents(db, [
+      { type: "live_start", roomId: "rd", creator: creator("dora"), at: at(12) },
+      { type: "gift", roomId: "rd", gifter: fan("f1"), giftName: "Rose", diamonds: 7, at: at(12, 1) },
+    ]);
+    const forDora = await gifterRanking(db, { period: "day", at: NOW, creator: "dora", limit: 10, offset: 0 });
+    expect(forDora.items.map((i) => [i.uniqueId, i.diamonds])).toEqual([["f1", 7]]);
   });
 
   it("builds creator profile and country overview", async () => {

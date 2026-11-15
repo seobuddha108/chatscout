@@ -32,3 +32,29 @@ export async function revokeKey(formData: FormData) {
   await revokeApiKey(db, id);
   revalidatePath("/dashboard");
 }
+
+// --- Following -------------------------------------------------------------------------------
+import { followCreator, setNoTracking, unfollowCreator, type FollowResult } from "@/follow/follows";
+
+export async function followAction(_prev: FollowResult | null, formData: FormData): Promise<FollowResult> {
+  const creator = await currentCreator();
+  if (!creator) return { ok: false, error: "Bitte melde dich erneut an." };
+  const res = await followCreator(await getDb(), creator.id, String(formData.get("handle") ?? ""));
+  revalidatePath("/dashboard");
+  return res;
+}
+
+export async function unfollowAction(formData: FormData) {
+  const creator = await currentCreator();
+  const id = Number(formData.get("creatorId"));
+  if (!creator || !Number.isInteger(id)) return;
+  await unfollowCreator(await getDb(), creator.id, id);
+  revalidatePath("/dashboard");
+}
+
+export async function noTrackingAction(formData: FormData) {
+  const creator = await currentCreator();
+  if (!creator) return;
+  await setNoTracking(await getDb(), creator.id, formData.get("noTracking") === "on");
+  revalidatePath("/dashboard");
+}

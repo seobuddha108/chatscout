@@ -108,6 +108,22 @@ They were written without access to TikTok's docs, so check them against the cur
 
 Plans are defined in `src/api/plans.ts` (basic/pro/business: requests per day and maximum `limit`).
 
+## Tracking creators
+
+Accounts with an active package can follow any public creator (`follows`, limits per plan in `src/api/plans.ts`).
+Followed creators are watched by the live worker like the account's own streams. `src/live/policy.ts` decides what is stored:
+
+| Stream | Chat, gifts, poll votes |
+|---|---|
+| the account's own (verified + active key) | with usernames |
+| followed by an account with an active package | **per-stream pseudonyms** (`Zuschauer #a3f9`, HMAC with `PSEUDONYM_SECRET`, fallback `CRON_SECRET`) |
+| anything else | chat not stored, gifters pseudonymous |
+
+Pseudonyms are stable within one stream and unlinkable across streams, so there is no way to follow a viewer across
+streams. Creators can opt out in the dashboard (`creators.no_tracking`). This deletes their follows and pseudonymous chat.
+The dashboard pages `/dashboard/c/:creator` (search, streams, polls) and `/dashboard/s/:room` (timeline, polls, chat)
+are only visible to the creator and their followers. In the API, use `GET /api/v1/chat/search?creator=…`.
+
 ## Real LIVE data (TikTok)
 
 `/api/cron/live` runs every minute (Vercel Pro, `maxDuration` 300 s) when `LIVE_SOURCE` includes `tiktok`:

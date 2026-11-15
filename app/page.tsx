@@ -32,8 +32,8 @@ export default function Home() {
             <span className={styles.eyebrow}>For TikTok LIVE creators</span>
             <h1>Find any message in your LIVE chat in seconds.</h1>
             <p className={styles.lead}>
-              ChatScout keeps the chat of your own TikTok LIVE streams searchable. Find giveaway entries, spam and
-              scam links, or everything a viewer wrote, so you can moderate and reward your community with ease.
+              ChatScout records the TikTok LIVE streams you care about, your own and any creator you track, and makes their chat
+              searchable. Find giveaway entries, spam and scam links, poll results and the moments that blew up.
             </p>
             <div className={styles.ctaRow}>
               <a className={styles.cta} href="/api/auth/tiktok/start">Login with TikTok</a>
@@ -61,6 +61,8 @@ export default function Home() {
               <p>Search by words, exclude terms, filter by viewer or time. Jump straight to the right moment.</p></div>
             <div className={styles.card}><div className={styles.icon}>📊</div><h3>Poll results</h3>
               <p>See how your polls went, minute by minute, and who voted in your own streams.</p></div>
+            <div className={styles.card}><div className={styles.icon}>📡</div><h3>Track any creator</h3>
+              <p>Follow creators and every LIVE gets recorded automatically: timeline, polls, gifts and a searchable chat.</p></div>
             <div className={styles.card}><div className={styles.icon}>🎬</div><h3>Where you were discussed</h3>
               <p>Find streams that talked about you, with reach, gifts and chat mood.</p></div>
             <div className={styles.card}><div className={styles.icon}>🛡️</div><h3>Moderation help</h3>
@@ -82,7 +84,8 @@ export default function Home() {
           <h2>Privacy by design</h2>
           <p className={styles.sub}>Your community&apos;s trust matters, so we keep it simple.</p>
           <ul className={styles.privacy}>
-            <li>Only your <strong>own</strong> streams. There is no search across other creators or other people&apos;s streams.</li>
+            <li>Viewer names are only shown in your <strong>own</strong> streams. In tracked streams they are replaced by per-stream pseudonyms, so nobody can be followed across streams.</li>
+            <li>Creators can opt out of being tracked at any time.</li>
             <li>Chat messages are deleted automatically after 30 days.</li>
             <li>Viewers can ask to have their messages deleted at any time.</li>
             <li>We revoke the TikTok access token right after login and never post on your behalf.</li>
@@ -95,7 +98,7 @@ export default function Home() {
           <details><summary>Is ChatScout made by TikTok?</summary>
             <p>No. ChatScout is an independent tool and is not affiliated with or endorsed by TikTok or ByteDance.</p></details>
           <details><summary>Can I see the chat of other creators?</summary>
-            <p>No. You can only search the chat of the account you logged in with.</p></details>
+            <p>Yes, for creators you follow: their LIVE chat is recorded and searchable, with viewer names replaced by pseudonyms. Creators can opt out.</p></details>
           <details><summary>What does it cost?</summary>
             <p>You can start with a free 7-day trial from your dashboard. Paid packages will follow.</p></details>
           <details><summary>Is there an API?</summary>
