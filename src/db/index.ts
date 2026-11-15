@@ -25,6 +25,8 @@ async function connect(): Promise<DB> {
     const client = postgres(url, { prepare: false, max: 5 });
     return drizzle({ client, schema }) as unknown as DB;
   }
+  // On Vercel the filesystem is read-only and ephemeral: a real database is required.
+  if (process.env.VERCEL) throw new Error("DATABASE_URL is not set. Add your Supabase pooler URL in the Vercel project settings.");
   // No DATABASE_URL: embedded Postgres (PGlite), auto-migrated.
   const dir = process.env.PGLITE_DIR ?? path.join(process.cwd(), ".data", "pglite");
   return createPgliteDb(dir);
